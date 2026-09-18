@@ -10,7 +10,7 @@
 | AT-04 | F-04 | 成功/全低関連/不正応答/一部失敗 | 順序とstatusが03の契約どおり、候補無断削除なし | G2 |
 | AT-05 | F-05, S-02 | Private/Private2、本文タグ、configDir変更 | 対象のみ索引/送信から除外 | G1/G2 |
 | AT-06 | F-06 | 送信待ち中に新query/削除/キー変更 | 遅着がUI/キャッシュを上書きしない | G2 |
-| AT-07 | F-07 | live無効/キーのみ/live+キーを順に実行 | 3条件成立時だけ合成データ最大3送信。**Gateway(`only:['typesafe-ai']`)とDirect両経路で確認** | G0 |
+| AT-07 | F-07 | live無効/キーのみ/live+キーを順に実行 | 3条件成立時だけ合成データ最大3送信。**OpenRouter(`only:['typesafe']` + `allow_fallbacks:false` + `zdr:true`)とDirect両経路で確認** | G0 |
 | AT-08 | S-01 | 識別用ダミー秘密を使いログ/設定/成果物検索 | ダミー秘密・本文・queryが流出しない | G2 |
 | AT-09 | S-03 | 欠損ID、NaN、範囲外、HTMLを模擬 | 検証拒否または文字表示、DOM実行なし | G2 |
 | AT-10 | S-04 | テスト前後の全Markdown SHA-256比較 | 一致、削除/改名/新規ファイルなし | G1/G4 |

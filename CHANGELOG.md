@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- [docs/design/00-why-jev-obsidian.md](docs/design/00-why-jev-obsidian.md): the rationale for the product.
+  It records a comprehensive summary of Jev's characteristics and published limitations, why a
+  retrieval-first design is required, why Jev and a "second brain" fit together, the goals and explicit
+  non-goals, and a mapping from each Jev property to the design decision it justifies.
+
+### Changed
+
+- **ADR-012**: OpenRouter (`POST https://openrouter.ai/api/alpha/decisions`) becomes the first route for
+  development and verification, with the TypeSafe API directly second and Vercel AI Gateway third.
+  General users are offered OpenRouter and TypeSafe direct. The OpenRouter contract exposes the same
+  `DecisionsScoreQuestion` / `DecisionsScoreAnswer` shape already implemented, and additionally allows
+  resolved model version verification, actual cost reporting through `usage.cost`, provider pinning, and a
+  zero data retention requirement.
+- Design documents 02, 04, 06, 07, and 08 updated for the third destination, and both READMEs updated.
+- The plugin code has **not** been updated for OpenRouter yet; `src/core/jev.ts` still implements only the
+  Gateway and direct routes.
+
 ## [0.1.0] - 2026-09-18
 
 Initial development preview. This is not a stable release for general distribution, and the

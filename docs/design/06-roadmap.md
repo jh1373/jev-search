@@ -37,6 +37,16 @@ APIキーをチャットで要求しない。GitHubへの公開は完成物レ�
   と `only: ['typesafe-ai']` を固定し、警告が1件でもあれば不採用・ローカル維持とする。
   将来Gatewayが版露出を始めたら検証を有効化する。公開時の既定はユーザーの利用実態とZDR/料金を比較して
   G4で再判断する（無断で「TypeSafe公式と同等」とは宣伝しない）。
+- ADR-012 OpenRouterを第一経路に: 開発・検証の第一経路をOpenRouter(`https://openrouter.ai/api/alpha/decisions`)へ変更し、
+  TypeSafe直接(`api.typesafe.ai/v1/systemone`)を第2経路、Vercel AI Gatewayを第3経路へ下げる。
+  一般ユーザーへの提供は OpenRouter と TypeSafe直接 の2経路とする。理由: (1) 応答に解決済みモデル版が含まれ
+  ADR-008の版照合が成立する（Gatewayでは不可能だった）、(2) `usage.cost` で実コストを取得できる、
+  (3) `provider.only:['typesafe']` + `allow_fallbacks:false` で他プロバイダへのフォールバックを禁止でき、
+  (4) `zdr:true` + `data_collection:'deny'` を要求でき、TypeSafeはOpenRouterのZDRエンドポイント一覧に登録済み、
+  (5) 価格は $0.042/MTok で直接経路と同額（マークアップなし）。
+  制約: 契約は `/api/alpha/decisions` であり実験的である。OpenAPI仕様は公開されているが版が予告なく変わり得るため、
+  契約版を固定してcanaryで検出し、失敗時はローカル維持とする。OpenRouterはプロンプトが経由する第三者であるため、
+  同意ダイアログとREADMEに明示する。BYOK(ADR-001)は不変で、開発者キーは埋め込まない。
 
 ## リスク登録簿
 

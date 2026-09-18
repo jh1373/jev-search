@@ -12,16 +12,17 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 
 ## 読む順序
 
-1. [製品要件・アーキテクチャ](docs/design/01-architecture.md)
-2. [Jev通信・実行時検証・キャッシュ](docs/design/02-jev-client.md)
-3. [日本語検索・インデックス・再ランキング](docs/design/03-search-rerank.md)
-4. [UI・外部送信同意・秘密情報](docs/design/04-ui-privacy.md)
-5. [テスト・配布・運用](docs/design/05-testing-release.md)
-6. [段階計画・設計判断・リスク](docs/design/06-roadmap.md)
-7. [要件と受入テストの対応表](docs/design/07-acceptance.md)
-8. [出典・確認済み事項・保留事項](docs/design/08-evidence.md)
-9. [日本語評価プロトコル](docs/benchmark/protocol.md)
-10. [レビュー記録・改善バックログ（2026-09-18）](docs/reviews/2026-09-18-product-tradeoffs.md)
+1. [なぜ Jev × Obsidian なのか](docs/design/00-why-jev-obsidian.md) ← まずこれを読む
+2. [製品要件・アーキテクチャ](docs/design/01-architecture.md)
+3. [Jev通信・実行時検証・キャッシュ](docs/design/02-jev-client.md)
+4. [日本語検索・インデックス・再ランキング](docs/design/03-search-rerank.md)
+5. [UI・外部送信同意・秘密情報](docs/design/04-ui-privacy.md)
+6. [テスト・配布・運用](docs/design/05-testing-release.md)
+7. [段階計画・設計判断・リスク](docs/design/06-roadmap.md)
+8. [要件と受入テストの対応表](docs/design/07-acceptance.md)
+9. [出典・確認済み事項・保留事項](docs/design/08-evidence.md)
+10. [日本語評価プロトコル](docs/benchmark/protocol.md)
+11. [レビュー記録・改善バックログ（2026-09-18）](docs/reviews/2026-09-18-product-tradeoffs.md)
 
 レビューの5項目は未検証です。開発工程の開始・完了時に確認し、実測結果と判断を追記します。
 
@@ -31,8 +32,9 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 - 初版はデスクトップ対応、Markdownの読み取り専用検索。モバイル対応とは表示しない。
 - APIキーなしでローカル検索可能。Jevは明示的に有効化し、送信ごとに内容を確認。
 - Jevは再ランキング担当。意味検索、回答生成、ノート編集は初版の対象外。
-- 送信先は2つの固定経路のみ。**Vercel AI Gateway 経由（既定）** と TypeSafe API 直接。任意URLは設定できない。
-  開発者がTypeSafe直接キーをまだ保有していないため、開発はGateway経由で進める（ADR-011）。
+- 送信先はコード固定で、任意URLは設定できない。**一般ユーザーへの提供は OpenRouter と TypeSafe API 直接の2経路**。
+  開発・検証の第一経路は **OpenRouter（既定）**、TypeSafe直接を第2、Vercel AI Gatewayを第3とする（ADR-012）。
+  Gateway は応答に解決済みモデル版を返さず版照合ができないため、品質検証の主経路には使わない。
 - 除外処理はインデックス投入前と送信直前の二段階。未評価候補を誤って消さない。
 - 初版ではJevのスコアで候補を削除しない。関連度順にするだけ。
 - 価格・モデル・SDKの公開情報は保証ではない。実APIとObsidian内で検証してから出荷。
@@ -45,7 +47,7 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 | Obsidian実行ファイル | `C:\Users\systemuser\AppData\Local\Programs\Obsidian\Obsidian.exe` の存在を確認 |
 | Node / npm / Git | 24.18.0 / 11.15.0 / 2.52.0.windows.1 |
 | npm公開版の照会 | obsidian 1.13.1 / typescript 7.0.2 / esbuild 0.28.2 / vitest 5.0.1 |
-| APIキー | TypeSafe直接キーは未取得（待機リスト中）。開発は Vercel AI Gateway のキーで進める想定 |
+| APIキー | TypeSafe直接キーは未取得（待機リスト中）。**OpenRouter のキーは発行済み**。開発は OpenRouter 経由で進める（ADR-012） |
 | 既存Vault | Obsidian設定から所在のみ確認。テスト対象にはしない |
 
 npm版の照会は互換性検証ではありません。依存の採用・固定はG0で実ビルド後に行います。

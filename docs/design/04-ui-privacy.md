@@ -3,7 +3,8 @@
 ## 初回体験
 
 インストール → ローカル検索が利用可能 → 任意の「Jevを設定」 → 外部送信説明
-→ セッション内キー入力 → 合成データの接続テスト（明示ボタン） → Jev機能を有効化。
+→ 接続先の選択（OpenRouter / TypeSafe直接） → セッション内キー入力 → 合成データの接続テスト（明示ボタン）
+→ Jev機能を有効化。
 キーの有無だけで外部送信を有効化しない。UIは日本語/英語を初版から文言辞書で分離。
 
 検索ビュー: 入力、ローカル件数/更新状態、再ランキングボタン、ローカル/Jevタブ。
@@ -13,10 +14,12 @@ confidence/確率分布は詳細展開し、正答率ではないと説明する
 ## 厳密な送信同意
 
 初版は毎回プレビュー必須。セッション一括同意・背景送信・自動再送ボタン連打は設けない。
-表示するもの: 宛先ホスト（Gateway=`ai-gateway.vercel.sh` / Direct=`api.typesafe.ai`）、モデル識別子、
-質問テンプレート、クエリ、匿名ID、タイトル、見出し、抜粋の全文、件数、分割数、byte数、概算費用、再試行最大1回の注意。
-Gateway 経由の場合は「Vercel AI Gateway を経由して TypeSafe AI に転送される」こと、保持・学習条件は
-Gateway と提供元の方針に従うことを明示する（当プラグインは保証しない）。
+表示するもの: 宛先ホスト（OpenRouter=`openrouter.ai` / Direct=`api.typesafe.ai` / Gateway=`ai-gateway.vercel.sh`）、
+モデル識別子、質問テンプレート、クエリ、匿名ID、タイトル、見出し、抜粋の全文、件数、分割数、byte数、概算費用、
+再試行最大1回の注意。
+OpenRouter 経由の場合は「OpenRouter を経由して TypeSafe AI に転送される」こと、プロバイダを TypeSafe に固定し
+ZDR（ゼロデータ保持）を要求していること、保持・学習の最終条件は OpenRouter と提供元の方針に従うことを明示する
+（当プラグインは保証しない）。Gateway 経由の場合も「Vercel AI Gateway を経由して TypeSafe AI に転送される」ことを明示する。
 短いノートは全文が抜粋に入る場合がある。「全文は決して送らない」と説明しない。
 
 承認対象は確定serialized JSON（全バッチ）のhash。承認後に同じbodyを送信する。
@@ -36,6 +39,7 @@ Gateway と提供元の方針に従うことを明示する（当プラグイン
 ## キー保存
 
 初期リリースはセッションメモリのみ。設定JSONにapiKeyを保存しない。
+接続先ごとに独立して保持し、接続先を切り替えても他経路のキーは表示・流用しない。
 Obsidian SecretStorageが最低対応版で使えるかG0で公式型/実機を確認し、保存オプションを
 実装するか決める。保存時の暗号化/同期範囲を未確認のまま安全だと宣伝しない。
 非対応ならセッション入力に戻し、平文ファイルへ無断フォールバックしない。
@@ -49,7 +53,7 @@ Obsidian SecretStorageが最低対応版で使えるかG0で公式型/実機を�
 | schemaVersion | 1 | 未知の新版は読取のみ・上書き禁止 |
 | rerankEnabled | false | boolean |
 | model | jev-1.13.0 | Direct のみ。G0検証版、最大64文字。Gateway はヘッダの `typesafe-ai/jev` を使用 |
-| endpoint | gateway | `gateway` / `direct` のみ。任意URLは拒否 |
+| endpoint | openrouter | `openrouter` / `direct` / `gateway` のみ。任意URLは拒否 |
 | fetchK | 50 | 整数10〜100 |
 | rerankNotes | 20 | 整数1〜20 |
 | excludedFolders / excludedTags | 本書既定 | 100件・各256文字以内 |

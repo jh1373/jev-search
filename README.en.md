@@ -16,16 +16,17 @@ Obsidian product.
 
 ## Reading order
 
-1. [Product requirements and architecture](docs/design/01-architecture.md)
-2. [Jev transport, runtime validation, and caching](docs/design/02-jev-client.md)
-3. [Japanese search, indexing, and reranking](docs/design/03-search-rerank.md)
-4. [UI, transmission consent, and secrets](docs/design/04-ui-privacy.md)
-5. [Testing, release, and operations](docs/design/05-testing-release.md)
-6. [Gates, decisions, and risks](docs/design/06-roadmap.md)
-7. [Requirements to acceptance test mapping](docs/design/07-acceptance.md)
-8. [Sources, confirmed facts, and open questions](docs/design/08-evidence.md)
-9. [Japanese evaluation protocol](docs/benchmark/protocol.md)
-10. [Review record and improvement backlog (2026-09-18)](docs/reviews/2026-09-18-product-tradeoffs.md)
+1. [Why Jev x Obsidian](docs/design/00-why-jev-obsidian.md) - start here
+2. [Product requirements and architecture](docs/design/01-architecture.md)
+3. [Jev transport, runtime validation, and caching](docs/design/02-jev-client.md)
+4. [Japanese search, indexing, and reranking](docs/design/03-search-rerank.md)
+5. [UI, transmission consent, and secrets](docs/design/04-ui-privacy.md)
+6. [Testing, release, and operations](docs/design/05-testing-release.md)
+7. [Gates, decisions, and risks](docs/design/06-roadmap.md)
+8. [Requirements to acceptance test mapping](docs/design/07-acceptance.md)
+9. [Sources, confirmed facts, and open questions](docs/design/08-evidence.md)
+10. [Japanese evaluation protocol](docs/benchmark/protocol.md)
+11. [Review record and improvement backlog (2026-09-18)](docs/reviews/2026-09-18-product-tradeoffs.md)
 
 The five review items are unverified. They are checked at the start and end of each
 implementation gate, and measurements and decisions are appended.
@@ -38,10 +39,12 @@ implementation gate, and measurements and decisions are appended.
   previewed before it is sent.
 - Jev reranks results. Semantic search, answer generation, and note editing are out of scope for
   the first version.
-- Only two fixed destinations are possible: **via Vercel AI Gateway (default)** and the TypeSafe
-  API directly. No arbitrary URL can be configured.
-- Because the developer does not yet hold a direct TypeSafe key, development proceeds through the
-  Gateway (ADR-011).
+- Destinations are fixed in code, and no arbitrary URL can be configured. **General users are
+  offered two routes: OpenRouter and the TypeSafe API directly.** Development and verification use
+  **OpenRouter (default)** as the first route, TypeSafe direct as the second, and Vercel AI Gateway as
+  the third (ADR-012).
+- The Gateway cannot verify the resolved model version, so it is not used as the primary route for
+  quality verification.
 - Exclusion is applied twice: before indexing and immediately before transmission. Unevaluated
   candidates are not silently dropped.
 - The first version never deletes candidates based on the Jev score. It only reorders them.
@@ -56,7 +59,7 @@ implementation gate, and measurements and decisions are appended.
 | Obsidian executable | Existence of `C:\Users\systemuser\AppData\Local\Programs\Obsidian\Obsidian.exe` confirmed |
 | Node / npm / Git | 24.18.0 / 11.15.0 / 2.52.0.windows.1 |
 | npm registry query | obsidian 1.13.1 / typescript 7.0.2 / esbuild 0.28.2 / vitest 5.0.1 |
-| API key | No direct TypeSafe key yet (on the waiting list). Development is planned through a Vercel AI Gateway key |
+| API key | No direct TypeSafe key yet (on the waiting list). An **OpenRouter key has been issued**. Development proceeds through OpenRouter (ADR-012) |
 | Existing vault | Only its location was read from Obsidian settings. It is not used for testing |
 
 Querying the npm registry is not a compatibility verification. Dependencies are adopted and pinned

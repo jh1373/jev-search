@@ -6,6 +6,7 @@
 - src/core/jev.ts: **2つの固定送信先**（Vercel AI Gateway `/v4/ai/evaluation-model`、TypeSafe `/v1/systemone`）、
   最大24KiB/20候補、Score応答検証（Gateway: probabilities任意・rounding考慮・warnings拒否）、取消、4秒期限、限定リトライ。
   Gateway は `only:['typesafe-ai']` と `zeroDataRetention:true` を要求し、モデルはヘッダで指定する。
+  **ADR-012により OpenRouter が第一経路となるが、コードは未対応**（下記「経路の変更」参照）。
 - src/main.ts: 検索ビュー、設定（**接続先選択**）、セッションキー（**接続先ごとに保持・永続化しない**）、全文JSONプレビュー、明示送信、結果並べ替え、フォールバック。
 - scripts/build.mjs: main.js/manifest/stylesとSHA256SUMS生成。
 - 単体24件と生成バンドルのモック読込・検索検査。
@@ -78,20 +79,25 @@ Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未�
 合成ノートMeeting.mdに「定例会は毎週火曜日です」を配置。
 1. Obsidianのコマンドパレットで「Jev Search: Open search」。
 2. 「定例会」で検索しMeeting.mdの抜粋が表示されることを確認。
-3. 設定のJev Searchで **接続先（既定: Vercel AI Gateway）** を確認し、該当するAPIキーを入力（セッションのみ）。
-4. 「Preview test」で架空データと送信先を確認して送信すると1問の接続テスト（Gateway は `only:['typesafe-ai']`）。
+3. 設定のJev Searchで **接続先** を確認し、該当するAPIキーを入力（セッションのみ）。
+   ※ 現在のコードの既定は Vercel AI Gateway のまま。OpenRouter 対応後に既定が切り替わる（ADR-012）。
+4. 「Preview test」で架空データと送信先を確認して送信すると1問の接続テスト。
 5. 本文を送る再ランキングはEnable Jevを有効にし、検索画面から毎回承認。
 キーを共有チャット/スクリーンショット/Gitへ貼らない。
 
-## Gateway 移行メモ（2026-09-18）
+## 経路の変更（2026-09-18 / ADR-012）
 
-- 開発の第一経路を **Vercel AI Gateway** に変更（開発者がTypeSafe直接キーを未取得のため、ADR-011）。
-- 送信先は2経路ともコード固定で、ユーザーが任意URLを設定することはできない。
-- Gateway は応答に解決済みモデル版が無いため **版照合はできない**（Directのみ検証可能）。
-  版固定の保証を必要とする品質検証（G3）はDirectキー取得後に再評価する。
-- Gateway の probabilities は任意・`rounding` で許容差を拡大・`warnings` は1件でも不採用。
-- 実HTTP契約（`POST /v4/ai/evaluation-model`、ヘッダでモデル指定）は AI SDK ソースから確認した**実験的契約**。
-  将来変更された場合は canary テストで検出し、失敗時はローカル維持する。
+- 開発・検証の第一経路を **OpenRouter**（`POST https://openrouter.ai/api/alpha/decisions`）へ変更し、
+  TypeSafe直接を第2、Vercel AI Gatewayを第3とした。一般ユーザーへの提供は OpenRouter と TypeSafe直接 の2経路。
+- 理由: 応答に解決済みモデル版が含まれ **ADR-008の版照合が成立する**（Gatewayでは不可能だった）、
+  `usage.cost` で実コストを取得できる、`only:['typesafe']` + `allow_fallbacks:false` でプロバイダを固定でき、
+  `zdr:true` + `data_collection:'deny'` を要求できる（TypeSafeはOpenRouterのZDR一覧に登録済み）、
+  価格は $0.042/MTok で直接経路と同額。
+- 契約は `DecisionsScoreQuestion` / `DecisionsScoreAnswer` で、既存の `prepare()` / `validate()` とほぼ一致する。
+- 契約は `/api/alpha/decisions` であり**実験的**。失敗は canary テストで検出し、失敗時はローカル維持する。
+- **コードは未対応**。現在の `src/core/jev.ts` は Gateway / Direct の2経路のみを実装している。
+  OpenRouter への対応（`Target` の追加、`ENDPOINTS` / `requestFor` / `prepare` / `validate` / 単価表）は次の作業。
+- 実API送信は未実施。OpenRouterキーは発行済みだが、接続テスト（AT-07）はまだ実行していない。
 
 ## 設計との差分・出荷ブロッカー
 

@@ -8,6 +8,11 @@
 - [モデルと価格](https://docs.typesafe.ai/models.md): 取得時jev-1.13.0、$0.042/MTok、動的上限。
 - [Confidence](https://docs.typesafe.ai/confidence.md): 分布から導出、正答率と同一ではない。
 - [Vercel AI Gateway / Jev](https://vercel.com/ai-gateway/models/jev): スラッグ `typesafe-ai/jev`、入力 $0.04/M。
+- [OpenRouter / Jev 1.13](https://openrouter.ai/typesafe/jev-1.13): モダリティ `text->decisions`、入力 $0.042/MTok、出力 $0。
+- [OpenRouter OpenAPI仕様](https://openrouter.ai/openapi.json): `POST /api/alpha/decisions`、`DecisionsScoreQuestion` /
+  `DecisionsScoreAnswer`（`score`必須・`confidence`/`legend`/`probabilities`任意）、
+  `ProviderPreferences`（`only` / `allow_fallbacks` / `zdr` / `data_collection`）。
+- [OpenRouter ZDRエンドポイント一覧](https://openrouter.ai/api/v1/endpoints/zdr): `typesafe/jev-1.13` がZDR対象として登録済み。
 - [Vercel AI Gateway / Evaluation](https://vercel.com/docs/ai-gateway/modalities/evaluation): AI SDK の `experimental_evaluate`、score/choice/boolean。
 - [Vercel AI Gateway / Pricing](https://vercel.com/docs/ai-gateway/pricing): トークンのマークアップ・プラットフォーム料なし。
 - [Vercel AI Gateway / Security](https://vercel.com/docs/ai-gateway/security-and-compliance): 既定ZDR、per-request ZDR は Pro/Enterprise。

@@ -6,7 +6,7 @@ if (Test-Path -LiteralPath $reviewDirectory) {
   $files += @(Get-ChildItem -LiteralPath $reviewDirectory -Filter '*.md' -File | ForEach-Object FullName)
 }
 $errors = [System.Collections.Generic.List[string]]::new()
-if (@(Get-ChildItem (Join-Path $Root 'docs\design') -Filter '*.md').Count -ne 8) { $errors.Add('Expected eight active design documents') }
+if (@(Get-ChildItem (Join-Path $Root 'docs\design') -Filter '*.md').Count -ne 9) { $errors.Add('Expected nine active design documents') }
 foreach ($file in $files) {
   $text = [IO.File]::ReadAllText($file)
   if ($text.Contains([string][char]0xFFFD)) { $errors.Add("Replacement character: $file") }
