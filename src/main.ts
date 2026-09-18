@@ -1,13 +1,15 @@
 import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, TFile, getAllTags, Notice } from 'obsidian';
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
-import { prepare, evaluate, MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
+import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
 const VIEW='jev-search-view';
 type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target};
-const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'gateway'};
-const asTarget=(value:unknown):Target=>value==='direct'?'direct':'gateway';
-const modelName=(target:Target)=>target==='direct'?MODEL:GATEWAY_MODEL;
+const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter'};
+const asTarget=(value:unknown):Target=>value==='direct'?'direct':value==='gateway'?'gateway':'openrouter';
+const modelName=(target:Target)=>target==='direct'?MODEL:target==='openrouter'?OPENROUTER_MODEL:GATEWAY_MODEL;
+/** Prefer the actual charged cost when the route reports it; otherwise show a token-based estimate. */
+const costText=(r:{inputTokens:number|null;cost:number|null},target:Target)=>r.cost!==null?`$${r.cost.toFixed(6)} (actual)`:(r.inputTokens===null?'$unknown':`$${(r.inputTokens*PRICE_PER_MTOK[target]/1e6).toFixed(6)} (est.)`);
 export default class JevSearch extends Plugin {
-  index=new SearchIndex(); settings:Settings={...DEFAULT}; keys:Record<Target,string>={gateway:'',direct:''}; generation=0; loaded=true; busy=false;
+  index=new SearchIndex(); settings:Settings={...DEFAULT}; keys:Record<Target,string>={openrouter:'',direct:'',gateway:''}; generation=0; loaded=true; busy=false;
   /** Session-only keys, one per destination; never persisted to disk. */
   get key(){return this.keys[this.settings.endpoint];}
   set key(value:string){this.keys[this.settings.endpoint]=value;}
@@ -45,7 +47,7 @@ export default class JevSearch extends Plugin {
   }
   async open(){let leaf=this.app.workspace.getLeavesOfType(VIEW)[0];if(!leaf){leaf=this.app.workspace.getRightLeaf(false)??this.app.workspace.getLeaf(true);await leaf.setViewState({type:VIEW,active:true});}await this.app.workspace.revealLeaf(leaf);}
   async save(){this.index.clear();this.invalidate();const snapshot=structuredClone(this.settings);this.saves=this.saves.then(()=>this.saveData(snapshot)).catch(()=>{if(this.loaded)new Notice('Settings could not be saved');});await this.saves;await this.rebuild();}
-  onunload(){this.loaded=false;this.invalidate();this.keys={gateway:'',direct:''};this.index.clear();}
+  onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();}
 }
 class Consent extends Modal {
   private done=false; private finish:(value:boolean)=>void;
@@ -53,6 +55,7 @@ class Consent extends Modal {
   onOpen(){const target=this.plugin.settings.endpoint;this.titleEl.setText('外部送信を確認 / Confirm transmission');
     this.contentEl.createEl('p',{text:`宛先: ${ENDPOINTS[target].host} | Model: ${modelName(target)}`});
     if(target==='gateway')this.contentEl.createEl('p',{text:'Vercel AI Gateway を経由して TypeSafe AI に転送されます。保持・学習の条件はGatewayと提供元の方針に従い、当プラグインは保証しません。'});
+    if(target==='openrouter')this.contentEl.createEl('p',{text:'OpenRouter を経由して TypeSafe AI に転送されます。プロバイダを TypeSafe に固定し、ZDR（ゼロデータ保持）を要求しています。保持・学習の最終条件は OpenRouter と提供元の方針に従い、当プラグインは保証しません。'});
     this.contentEl.createEl('p',{text:'クエリ・タイトル・抜粋を送信します。短いノートは全文を含みます。以下が送信するJSON全体です。取消しても送信済みデータは回収できません。'});
     this.contentEl.createEl('p',{text:`${Buffer.byteLength(this.body)} bytes · 概算 $${(Buffer.byteLength(this.body)*PRICE_PER_MTOK[target]/1e6).toFixed(6)}（課金上限ではありません）`});
     this.contentEl.createEl('pre',{text:this.body,cls:'jev-preview'});
@@ -97,7 +100,7 @@ class SearchView extends ItemView {
       const scores=new Map(hits.slice(0,prepared.count).map((h,i)=>[h.id,r.scores[i]]));
       const ranked=hits.slice(0,prepared.count).sort((a,b)=>scores.get(b.id)!-scores.get(a.id)!);
       const allLow=r.scores.every(s=>s<1);this.render(allLow?this.local:[...ranked,...this.local.slice(prepared.count)],scores);
-      this.status.setText(`${allLow?'関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · input tokens: ${r.inputTokens??'unknown'} · $${r.inputTokens===null?'unknown':(r.inputTokens*PRICE_PER_MTOK[p.settings.endpoint]/1e6).toFixed(6)}`);
+      this.status.setText(`${allLow?'関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · input tokens: ${r.inputTokens??'unknown'} · ${costText(r,p.settings.endpoint)}`);
     } catch(error){if(p.loaded&&generation===p.generation&&epoch===this.epoch){this.render(this.local);this.status.setText(`Local fallback: ${error instanceof Error?error.message:'failed'}`);}}
     finally{p.busy=false;if(p.controller===controller)p.controller=null;}
   }
@@ -110,7 +113,7 @@ class Preferences extends PluginSettingTab {
   display(){this.containerEl.empty();const p=this.plugin;
     this.containerEl.createEl('p',{text:'Experimental preview. キーはメモリのみ。再起動で消えます。外部送信は毎回確認します。'});
     new Setting(this.containerEl).setName('Jevを有効化 / Enable Jev').addToggle(t=>t.setValue(p.settings.enabled).onChange(async value=>{p.settings.enabled=value;await p.save();}));
-    new Setting(this.containerEl).setName('接続先 / Endpoint').setDesc('Vercel AI Gateway 経由（既定）、または TypeSafe API へ直接送信。任意URLは設定できません。').addDropdown(d=>d.addOption('gateway','Vercel AI Gateway').addOption('direct','TypeSafe API (direct)').setValue(p.settings.endpoint).onChange(async value=>{p.invalidate();p.settings.endpoint=asTarget(value);await p.save();}));
+    new Setting(this.containerEl).setName('接続先 / Endpoint').setDesc('OpenRouter 経由（既定）、または TypeSafe API へ直接送信。Vercel AI Gateway も選択できます。任意URLは設定できません。').addDropdown(d=>d.addOption('openrouter','OpenRouter').addOption('direct','TypeSafe API (direct)').addOption('gateway','Vercel AI Gateway').setValue(p.settings.endpoint).onChange(async value=>{p.invalidate();p.settings.endpoint=asTarget(value);await p.save();}));
     new Setting(this.containerEl).setName('API key (session only)').setDesc(`${ENDPOINTS[p.settings.endpoint].host} 用のキー。接続先ごとにメモリのみ保持し、再起動で消えます。`).addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setValue(p.key).onChange(value=>{p.invalidate();p.key=value.trim();});});
     new Setting(this.containerEl).setName('除外フォルダ / Excluded folders').setDesc('One vault-relative folder per line').addTextArea(t=>t.setValue(p.settings.folders.join('\n')).onChange(async value=>{const folders=value.split('\n').map(s=>s.trim()).filter(Boolean);if(folders.some(s=>s.includes('..')||s.startsWith('/')||s.includes(':'))){new Notice('Invalid folder path');return;}p.settings.folders=folders.slice(0,100);await p.save();}));
     new Setting(this.containerEl).setName('除外タグ / Excluded tags').addTextArea(t=>t.setValue(p.settings.tags.join('\n')).onChange(async value=>{p.settings.tags=value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,100);await p.save();}));
@@ -119,7 +122,7 @@ class Preferences extends PluginSettingTab {
       if(!p.key||p.busy){new Notice('Key required / request already running');return;}
       const prepared=prepare('定例会の曜日は？',[{title:'架空チーム',heading:'会議',text:'定例会は毎週火曜日です。'}],p.settings.endpoint);const generation=p.generation;
       if(!await new Promise<boolean>(resolve=>new Consent(p,prepared.body,resolve).open())||p.busy||!p.loaded||p.generation!==generation)return;
-      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · input tokens: ${r.inputTokens??'unknown'}`);}catch{if(p.loaded)new Notice('接続確認失敗。キー・ネットワーク・モデルを確認してください。');}finally{p.busy=false;p.controller=null;}
+      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · ${costText(r,p.settings.endpoint)}`);}catch{if(p.loaded)new Notice('接続確認失敗。キー・ネットワーク・モデルを確認してください。');}finally{p.busy=false;p.controller=null;}
     }));
   }
 }

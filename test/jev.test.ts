@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prepare, validate, evaluate, requestFor, MODEL, GATEWAY_MODEL, ENDPOINTS, type Transport } from '../src/core/jev.ts';
+import { prepare, validate, evaluate, requestFor, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, type Transport } from '../src/core/jev.ts';
 const answer={type:'score',score:2,confidence:1,probabilities:{'0':0,'1':0,'2':1},legend:{'0':'a','1':'b','2':'c'}};
 const response=()=>({model:MODEL,answers:{d0:structuredClone(answer)},usage:{input_tokens:100}});
 /** Gateway answers carry no legend and may omit probabilities/confidence; usage is camelCase. */
@@ -10,12 +10,12 @@ test('payload is bounded and excludes paths and arbitrary metadata',()=>{
  assert.ok(p.count>0&&p.count<=20);assert.ok(Buffer.byteLength(p.body)<=24576);assert.ok(!p.body.includes('PRIVATE'));
  assert.throws(()=>prepare('',[]));
 });
-test('direct response validation and missing usage',()=>{assert.deepEqual(validate(response(),1,'direct'),{scores:[2],inputTokens:100});const r:Record<string,unknown>=response();delete r.usage;assert.equal(validate(r,1,'direct').inputTokens,null);});
+test('direct response validation and missing usage',()=>{assert.deepEqual(validate(response(),1,'direct'),{scores:[2],inputTokens:100,cost:null});const r:Record<string,unknown>=response();delete r.usage;assert.equal(validate(r,1,'direct').inputTokens,null);});
 test('direct rejects missing answers, malformed probabilities, score, confidence and model',()=>{
  for(const mutate of [(r:any)=>r.model='other',(r:any)=>delete r.answers.d0,(r:any)=>r.answers.d0.score=3,(r:any)=>r.answers.d0.confidence=NaN,(r:any)=>r.answers.d0.probabilities['2']=.5]){const r=response();mutate(r);assert.throws(()=>validate(r,1,'direct'));}
 });
 test('gateway payload pins the destination, the model header and no fallback',()=>{
- const body=JSON.parse(prepare('会議',[{title:'議事録',heading:'定例',text:'本文'}]).body);
+ const body=JSON.parse(prepare('会議',[{title:'議事録',heading:'定例',text:'本文'}],'gateway').body);
  assert.equal(body.model,undefined);assert.deepEqual(body.providerOptions,{gateway:{only:['typesafe-ai'],zeroDataRetention:true}});assert.equal(body.questions.d0.type,'score');
  const direct=JSON.parse(prepare('会議',[{title:'議事録',heading:'定例',text:'本文'}],'direct').body);
  assert.equal(direct.model,MODEL);assert.equal(direct.providerOptions,undefined);
@@ -23,8 +23,8 @@ test('gateway payload pins the destination, the model header and no fallback',()
  assert.deepEqual(requestFor('direct'),{url:ENDPOINTS.direct.url,headers:{}});
 });
 test('gateway response is accepted with or without probabilities',()=>{
- assert.deepEqual(validate(gatewayResponse(),1,'gateway'),{scores:[1.6],inputTokens:312});
- assert.deepEqual(validate({answers:{d0:{type:'score',score:1.25}}},1,'gateway'),{scores:[1.25],inputTokens:null});
+ assert.deepEqual(validate(gatewayResponse(),1,'gateway'),{scores:[1.6],inputTokens:312,cost:null});
+ assert.deepEqual(validate({answers:{d0:{type:'score',score:1.25}}},1,'gateway'),{scores:[1.25],inputTokens:null,cost:null});
 });
 test('gateway rejects provider warnings, wrong answer type and unverifiable model values',()=>{
  assert.throws(()=>validate({...gatewayResponse(),warnings:[{type:'unsupported',feature:'score'}]},1,'gateway'),/provider-warning/);
@@ -52,3 +52,33 @@ test('unauthorized and uncertain network failures are not retried',async()=>{
 });
 test('pre-cancelled requests do not send',async()=>{const c=new AbortController();c.abort();let sent=false;await assert.rejects(evaluate('{}',1,'fake',c.signal,'gateway',async()=>{sent=true;return{status:200,body:''};}));assert.equal(sent,false);});
 test('long Retry-After stops without retrying',async()=>{let n=0;await assert.rejects(evaluate('{}',1,'fake',new AbortController().signal,'direct',async()=>{n++;return{status:529,retryAfter:'120',body:''};}),/rate-limit/);assert.equal(n,1);});
+const openrouterResponse=(extra:Record<string,unknown>={})=>({model:OPENROUTER_MODEL,answers:{d0:structuredClone(answer)},usage:{input_tokens:240,output_tokens:0,cost:0.0000101},...extra});
+test('openrouter payload pins the model, the provider and zero data retention',()=>{
+ const body=JSON.parse(prepare('会議',[{title:'議事録',heading:'定例',text:'本文'}]).body);
+ assert.equal(body.model,OPENROUTER_MODEL);
+ assert.deepEqual(body.provider,{only:['typesafe'],allow_fallbacks:false,zdr:true,data_collection:'deny'});
+ assert.equal(body.providerOptions,undefined);
+ assert.equal(body.questions.d0.type,'score');
+ assert.equal(ENDPOINTS.openrouter.url,'https://openrouter.ai/api/alpha/decisions');
+ assert.deepEqual(requestFor('openrouter'),{url:ENDPOINTS.openrouter.url,headers:{}});
+});
+test('the default route is OpenRouter',()=>{
+ assert.equal(JSON.parse(prepare('会議',[{title:'t',heading:'h',text:'b'}]).body).model,OPENROUTER_MODEL);
+ assert.equal(validate(openrouterResponse(),1).scores[0],2);
+});
+test('openrouter accepts the resolved snapshot version and reports the actual cost',()=>{
+ assert.deepEqual(validate(openrouterResponse(),1,'openrouter'),{scores:[2],inputTokens:240,cost:0.0000101});
+ assert.deepEqual(validate(openrouterResponse({model:OPENROUTER_MODEL+'-20260917'}),1,'openrouter').scores,[2]);
+ const noCost:any=openrouterResponse();delete noCost.usage.cost;
+ assert.equal(validate(noCost,1,'openrouter').cost,null);
+ const noUsage:any=openrouterResponse();delete noUsage.usage;
+ assert.deepEqual(validate(noUsage,1,'openrouter'),{scores:[2],inputTokens:null,cost:null});
+});
+test('openrouter rejects a different model, provider warnings and a missing calibrated distribution',()=>{
+ for(const mutate of [(r:any)=>r.model='typesafe/jev-1.14',(r:any)=>delete r.model,(r:any)=>r.warnings=[{type:'unsupported'}],(r:any)=>delete r.answers.d0.probabilities,(r:any)=>delete r.answers.d0.confidence,(r:any)=>r.answers.d0.probabilities['2']=.5]){const r:any=openrouterResponse();mutate(r);assert.throws(()=>validate(r,1,'openrouter'));}
+});
+test('openrouter requests carry the fixed destination end to end',async()=>{
+ let seen:unknown;const send:Transport=async(_b,_k,_s,endpoint)=>{seen=endpoint;return{status:200,body:JSON.stringify(openrouterResponse())};};
+ const result=await evaluate('{}',1,'fake',new AbortController().signal,'openrouter',send);
+ assert.deepEqual(seen,requestFor('openrouter'));assert.equal(result.scores[0],2);assert.equal(result.cost,0.0000101);
+});

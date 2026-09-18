@@ -23,8 +23,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved model version verification, actual cost reporting through `usage.cost`, provider pinning, and a
   zero data retention requirement.
 - Design documents 02, 04, 06, 07, and 08 updated for the third destination, and both READMEs updated.
-- The plugin code has **not** been updated for OpenRouter yet; `src/core/jev.ts` still implements only the
-  Gateway and direct routes.
+### Implemented
+
+- `src/core/jev.ts` now supports the OpenRouter route as the default destination. The request pins
+  `provider: {only:['typesafe'],allow_fallbacks:false,zdr:true,data_collection:'deny'}` so the prompt cannot
+  fall back to a provider that does not return score probabilities. Validation requires the calibrated
+  distribution, verifies the resolved model version (`typesafe/jev-1.13` with an optional `-YYYYMMDD`
+  snapshot suffix), and reads the actual charged cost from `usage.cost` when the route reports it.
+- `src/main.ts` gains the destination option, the OpenRouter third-party consent notice, per-destination
+  session keys, and actual-cost display.
+- Added `scripts/smoke-live.mjs` and `npm run test:live` for the AT-07 live smoke test. It requires
+  `RUN_LIVE_TESTS=1` plus an environment API key, sends one synthetic request, and never writes or prints
+  the key.
+- Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
+  reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
+
+### Not yet done
+
+- No live API request has been made yet. `probabilities`, `confidence`, `legend`, the exact resolved
+  `model` string, real latency, and `usage.cost` presence are all unconfirmed until AT-07 runs.
 
 ## [0.1.0] - 2026-09-18
 

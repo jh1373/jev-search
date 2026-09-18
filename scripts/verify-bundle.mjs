@@ -23,9 +23,9 @@ assert.equal(instance.commands[0].id,'open-search');
 assert.equal(instance.views[0],'jev-search-view');
 assert.equal(instance.key,'');
 assert.equal(instance.settings.enabled,false);
-assert.equal(instance.settings.endpoint,'gateway','Gateway must be the default destination');
+assert.equal(instance.settings.endpoint,'openrouter','OpenRouter must be the default destination');
 // The mocked plugin runs in a separate vm context, so compare values rather than deepStrictEqual.
-assert.equal(instance.keys.gateway,'');assert.equal(instance.keys.direct,'');
+assert.equal(instance.keys.openrouter,'');assert.equal(instance.keys.gateway,'');assert.equal(instance.keys.direct,'');
 assert.ok(typeof instance.keys==='object'&&instance.keys!==null,'Session keys must never be persisted');
 instance.index.upsert({path:'Meeting.md',title:'架空チームの会議',text:'# 定例会\n定例会は毎週火曜日です。',tags:[]});
 instance.index.upsert({path:'Cooking.md',title:'料理',text:'夕食にカレーを作ります。',tags:[]});

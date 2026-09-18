@@ -3,13 +3,14 @@
 ## 実装したもの
 
 - src/core/search.ts: 日本語bigram/ASCII単語、fielded BM25、見出し分割、増分索引、除外判定。
-- src/core/jev.ts: **2つの固定送信先**（Vercel AI Gateway `/v4/ai/evaluation-model`、TypeSafe `/v1/systemone`）、
-  最大24KiB/20候補、Score応答検証（Gateway: probabilities任意・rounding考慮・warnings拒否）、取消、4秒期限、限定リトライ。
+- src/core/jev.ts: **3つの固定送信先**（OpenRouter `/api/alpha/decisions`、TypeSafe `/v1/systemone`、Vercel AI Gateway `/v4/ai/evaluation-model`）、
+  最大24KiB/20候補、Score応答検証（OpenRouter/Direct: probabilitiesとconfidence必須・版照合。Gateway: probabilities任意・rounding考慮）、
+  warnings拒否、取消、4秒期限、限定リトライ。OpenRouterは `usage.cost` があれば実コストとして扱う。
   Gateway は `only:['typesafe-ai']` と `zeroDataRetention:true` を要求し、モデルはヘッダで指定する。
-  **ADR-012により OpenRouter が第一経路となるが、コードは未対応**（下記「経路の変更」参照）。
+  **ADR-012により OpenRouter が第一経路（既定）**。`provider: {only:['typesafe'],allow_fallbacks:false,zdr:true,data_collection:'deny'}` で経路を固定する。
 - src/main.ts: 検索ビュー、設定（**接続先選択**）、セッションキー（**接続先ごとに保持・永続化しない**）、全文JSONプレビュー、明示送信、結果並べ替え、フォールバック。
 - scripts/build.mjs: main.js/manifest/stylesとSHA256SUMS生成。
-- 単体24件と生成バンドルのモック読込・検索検査。
+- 単体29件と生成バンドルのモック読込・検索検査。
 
 ## 開発・再現
 
@@ -22,7 +23,8 @@ TypeScriptの実行にはNodeの型除去を使用。node_modulesとdistはGit�
 
 | コマンド | 内容 | 外部通信 |
 |---|---|---|
-| `npm test` | 単体24件（検索・Jev検証・Gateway契約・再試行・取消） | なし |
+| `npm test` | 単体29件（検索・Jev検証・OpenRouter契約・再試行・取消） | なし |
+| **`npm run test:live`** | **AT-07 実APIスモーク（合成データ1送信。`RUN_LIVE_TESTS=1`とenvキーが必須）** | **あり（明示時のみ）** |
 | `npm run test:bundle` | 生成バンドルの読込・検索・初期OFF・終了処理 | なし |
 | `npm run check` | 型検査→単体→ビルド | なし |
 | **`npm run test:gui`** | **実機Obsidian GUI E2E（起動〜終了・証跡保存）** | **なし（不合格時は失敗扱い）** |
@@ -67,8 +69,8 @@ TypeScriptの実行にはNodeの型除去を使用。node_modulesとdistはGit�
 
 いずれも専用テストVaultでのみ動作し、Vault実パスが一致しなければ即中断します。
 
-型チェック、単体24件、ビルドは成功。クリーンコピーへのnpm ciでも再現。
-生成CommonJSをObsidianモックで読み込み、コマンド登録・初期外部通信OFF・接続先既定=Gateway・アンロードを確認。
+型チェック、単体29件、ビルドは成功。クリーンコピーへのnpm ciでも再現。
+生成CommonJSをObsidianモックで読み込み、コマンド登録・初期外部通信OFF・接続先既定=OpenRouter・アンロードを確認。
 Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未確認。
 過去のCDP検査はapp未定義で失敗し削除。これを実機成功とは数えない。
 実APIキーはProcess/User/Machineいずれも未設定。実API通信・課金テストは未実施。
@@ -79,8 +81,7 @@ Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未�
 合成ノートMeeting.mdに「定例会は毎週火曜日です」を配置。
 1. Obsidianのコマンドパレットで「Jev Search: Open search」。
 2. 「定例会」で検索しMeeting.mdの抜粋が表示されることを確認。
-3. 設定のJev Searchで **接続先** を確認し、該当するAPIキーを入力（セッションのみ）。
-   ※ 現在のコードの既定は Vercel AI Gateway のまま。OpenRouter 対応後に既定が切り替わる（ADR-012）。
+3. 設定のJev Searchで **接続先（既定: OpenRouter）** を確認し、該当するAPIキーを入力（セッションのみ）。
 4. 「Preview test」で架空データと送信先を確認して送信すると1問の接続テスト。
 5. 本文を送る再ランキングはEnable Jevを有効にし、検索画面から毎回承認。
 キーを共有チャット/スクリーンショット/Gitへ貼らない。
@@ -95,9 +96,13 @@ Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未�
   価格は $0.042/MTok で直接経路と同額。
 - 契約は `DecisionsScoreQuestion` / `DecisionsScoreAnswer` で、既存の `prepare()` / `validate()` とほぼ一致する。
 - 契約は `/api/alpha/decisions` であり**実験的**。失敗は canary テストで検出し、失敗時はローカル維持する。
-- **コードは未対応**。現在の `src/core/jev.ts` は Gateway / Direct の2経路のみを実装している。
-  OpenRouter への対応（`Target` の追加、`ENDPOINTS` / `requestFor` / `prepare` / `validate` / 単価表）は次の作業。
-- 実API送信は未実施。OpenRouterキーは発行済みだが、接続テスト（AT-07）はまだ実行していない。
+- **実装済み**。`Target` に `openrouter` を追加し、`ENDPOINTS` / `requestFor` / `prepare` / `validate` / 単価表と
+  `src/main.ts` の設定・同意表示・セッションキーを対応させた。既定の接続先は OpenRouter。
+- 版照合は `typesafe/jev-1.13` と日付サフィックス付きスナップショット（`-YYYYMMDD`）を許可する。
+- **実API送信は未実施**。AT-07 は `npm run test:live`（`RUN_LIVE_TESTS=1` + envキー）で実行する。
+  キーはユーザーの端末で設定し、この文書・リポジトリ・チャットには書かない。
+- 未確認: OpenRouter が `probabilities` / `confidence` / `legend` を実際に返すか、返る `model` の実文字列、
+  実レイテンシ（製品期限は4秒）、`usage.cost` の有無。AT-07 の出力で確定させる。
 
 ## 設計との差分・出荷ブロッカー
 

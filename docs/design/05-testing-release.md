@@ -1,13 +1,15 @@
 # 05. 検証・配布・運用設計
 
-本書のコマンドは実装時に追加する予定であり、現在実行可能なnpm scriptsではない。
+本書のコマンドの一部は未実装。実装済みは `npm run typecheck` / `test` / `test:live` / `build` / `test:bundle` / `test:gui` / `verify`。
 
 ## テスト層
 
 1. core単体: Vitest、Clock/Transport/Digestを注入し完全オフライン。
 2. adapter結合: Obsidianモックに加え専用Vaultで実アプリ検証。
-3. 実API: 明示的な `test:live` と `RUN_LIVE_TESTS=1` とenvキーの3条件。
-   合成データだけ、最大3送信、最大推定$0.01。通常testから呼ばない。
+3. 実API: 明示的な `npm run test:live`(`scripts/smoke-live.mjs`) と `RUN_LIVE_TESTS=1` とenvキーの3条件。
+   キーは `OPENROUTER_API_KEY` / `TYPESAFE_API_KEY` / `AI_GATEWAY_API_KEY` のいずれかをプロセスenvから読む。
+   合成データだけ、最大3送信（スクリプトは1送信）、最大推定$0.01。通常testから呼ばない。
+   キーはファイルへ書かず、出力にも含めない。混入していればスクリプトが失敗する。
 4. 評価: [日本語プロトコル](../benchmark/protocol.md)に沿い品質/速度/費用を測定。
 5. 非開発者ベータ: APIキー取得後から初回検索まで自力で完了できるか観察。
 
