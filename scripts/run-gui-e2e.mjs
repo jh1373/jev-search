@@ -43,6 +43,16 @@ try {
 } finally {
   stop();
 }
+if(summary.pass){
+  const dataPath=`${VAULT}/.obsidian/plugins/jev-search/data.json`;
+  if(existsSync(dataPath)){
+    const raw=await readFile(dataPath,'utf8');
+    if(raw.includes('probe-value-1234'))throw Error('The secret value reached data.json on disk');
+    console.log('PASS: secret value absent from data.json on disk');
+  } else {
+    console.log('NOTE: data.json was not written, so the on-disk check was skipped');
+  }
+}
 await writeFile(`${EVIDENCE}/summary.json`,JSON.stringify(summary,null,2));
 console.log(`\nGUI E2E ${summary.pass?'PASS':'FAIL'} — evidence: ${EVIDENCE}`);
 if(!summary.pass)process.exit(1);

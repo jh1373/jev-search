@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Design documents 02, 04, 06, 07, and 08 updated for the third destination, and both READMEs updated.
 ### Implemented
 
+- Keys can now be stored in Obsidian's `SecretStorage` instead of being re-entered on every start.
+  Settings hold only the secret **name**; the value never reaches `data.json`, and the bundle check now
+  fails if a secret value can reach the saved settings. A session-only override remains available and
+  takes precedence (ADR-013).
 - `src/core/jev.ts` now supports the OpenRouter route as the default destination. The request pins
   `provider: {only:['typesafe'],allow_fallbacks:false,zdr:true,data_collection:'deny'}` so the prompt cannot
   fall back to a provider that does not return score probabilities. Validation requires the calibrated

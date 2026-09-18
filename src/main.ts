@@ -1,23 +1,31 @@
-import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, TFile, getAllTags, Notice } from 'obsidian';
+import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, SecretComponent, TFile, getAllTags, Notice } from 'obsidian';
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
 import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
 const VIEW='jev-search-view';
-type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target};
-const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter'};
+type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target;secrets:Record<Target,string>};
+const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter',secrets:{openrouter:'',direct:'',gateway:''}};
 const asTarget=(value:unknown):Target=>value==='direct'?'direct':value==='gateway'?'gateway':'openrouter';
+/** SecretStorage ids must be lowercase alphanumeric with optional dashes. Only the name is persisted, never the value. */
+const asSecretId=(value:unknown)=>typeof value==='string'&&/^[a-z0-9-]{0,64}$/.test(value)?value:'';
 const modelName=(target:Target)=>target==='direct'?MODEL:target==='openrouter'?OPENROUTER_MODEL:GATEWAY_MODEL;
 /** Prefer the actual charged cost when the route reports it; otherwise show a token-based estimate. */
 const costText=(r:{inputTokens:number|null;cost:number|null},target:Target)=>r.cost!==null?`$${r.cost.toFixed(6)} (actual)`:(r.inputTokens===null?'$unknown':`$${(r.inputTokens*PRICE_PER_MTOK[target]/1e6).toFixed(6)} (est.)`);
 export default class JevSearch extends Plugin {
   index=new SearchIndex(); settings:Settings={...DEFAULT}; keys:Record<Target,string>={openrouter:'',direct:'',gateway:''}; generation=0; loaded=true; busy=false;
-  /** Session-only keys, one per destination; never persisted to disk. */
-  get key(){return this.keys[this.settings.endpoint];}
+  /** Session override for the current destination; cleared on unload. */
   set key(value:string){this.keys[this.settings.endpoint]=value;}
+  get secretName(){return this.settings.secrets[this.settings.endpoint];}
+  set secretName(value:string){this.settings.secrets[this.settings.endpoint]=value;}
+  /**
+   * Resolve the session override first, then the vault-keyed SecretStorage entry.
+   * The secret value is never written to data.json; only its name is stored there.
+   */
+  get key(){const session=this.keys[this.settings.endpoint];if(session)return session;const name=this.settings.secrets[this.settings.endpoint];if(!name)return '';try{return this.app.secretStorage.getSecret(name)??'';}catch{return '';}}
   controller:AbortController|null=null; skipped=0; indexed=false;
   private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve();
   async onload(){
     const raw=await this.loadData();
-    if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint)};
+    if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint),secrets:this.secrets(raw.secrets)};
     this.registerView(VIEW,leaf=>new SearchView(leaf,this));
     this.addRibbonIcon('search','Jev Search',()=>void this.open());
     this.addCommand({id:'open-search',name:'Open search',callback:()=>void this.open()});
@@ -31,6 +39,8 @@ export default class JevSearch extends Plugin {
     this.app.workspace.onLayoutReady(()=>{if(this.loaded)void this.rebuild();});
   }
   list(v:unknown,fallback:string[]):string[]{return Array.isArray(v)&&v.length<=100&&v.every(x=>typeof x==='string'&&x.length<=256)?v:[...fallback];}
+  /** Sanitize stored secret names. A value can never round-trip through here. */
+  secrets(v:unknown):Record<Target,string>{const source=v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};return {openrouter:asSecretId(source.openrouter),direct:asSecretId(source.direct),gateway:asSecretId(source.gateway)};}
   invalidate(){this.generation++;this.controller?.abort();for(const leaf of this.app.workspace.getLeavesOfType(VIEW)){if(leaf.view instanceof SearchView){leaf.view.invalidate();leaf.view.search();}}}
   allowed(file:TFile){const metadata=this.app.metadataCache.getFileCache(file);return file.extension==='md'&&file.stat.size<=1048576&&!!metadata&&!isExcluded(file.path,getAllTags(metadata)??[],this.settings.folders,this.settings.tags,this.app.vault.configDir);}
   schedule(file:TFile){const stamp=(this.updates.get(file.path)??0)+1;this.updates.set(file.path,stamp);this.queue=this.queue.then(async()=>{
@@ -46,7 +56,8 @@ export default class JevSearch extends Plugin {
     await this.queue;if(this.loaded){this.indexed=true;for(const leaf of this.app.workspace.getLeavesOfType(VIEW))if(leaf.view instanceof SearchView)leaf.view.search();}
   }
   async open(){let leaf=this.app.workspace.getLeavesOfType(VIEW)[0];if(!leaf){leaf=this.app.workspace.getRightLeaf(false)??this.app.workspace.getLeaf(true);await leaf.setViewState({type:VIEW,active:true});}await this.app.workspace.revealLeaf(leaf);}
-  async save(){this.index.clear();this.invalidate();const snapshot=structuredClone(this.settings);this.saves=this.saves.then(()=>this.saveData(snapshot)).catch(()=>{if(this.loaded)new Notice('Settings could not be saved');});await this.saves;await this.rebuild();}
+  async persist(){const snapshot=structuredClone(this.settings);this.saves=this.saves.then(()=>this.saveData(snapshot)).catch(()=>{if(this.loaded)new Notice('Settings could not be saved');});await this.saves;}
+  async save(){this.index.clear();this.invalidate();await this.persist();await this.rebuild();}
   onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();}
 }
 class Consent extends Modal {
@@ -111,10 +122,11 @@ class Preferences extends PluginSettingTab {
   plugin:JevSearch;
   constructor(app:JevSearch['app'],plugin:JevSearch){super(app,plugin);this.plugin=plugin;}
   display(){this.containerEl.empty();const p=this.plugin;
-    this.containerEl.createEl('p',{text:'Experimental preview. キーはメモリのみ。再起動で消えます。外部送信は毎回確認します。'});
+    this.containerEl.createEl('p',{text:'Experimental preview. キーはこのVaultの SecretStorage（値は data.json に入りません）か、セッションのみの上書きで保持します。外部送信は毎回確認します。'});
     new Setting(this.containerEl).setName('Jevを有効化 / Enable Jev').addToggle(t=>t.setValue(p.settings.enabled).onChange(async value=>{p.settings.enabled=value;await p.save();}));
     new Setting(this.containerEl).setName('接続先 / Endpoint').setDesc('OpenRouter 経由（既定）、または TypeSafe API へ直接送信。Vercel AI Gateway も選択できます。任意URLは設定できません。').addDropdown(d=>d.addOption('openrouter','OpenRouter').addOption('direct','TypeSafe API (direct)').addOption('gateway','Vercel AI Gateway').setValue(p.settings.endpoint).onChange(async value=>{p.invalidate();p.settings.endpoint=asTarget(value);await p.save();}));
-    new Setting(this.containerEl).setName('API key (session only)').setDesc(`${ENDPOINTS[p.settings.endpoint].host} 用のキー。接続先ごとにメモリのみ保持し、再起動で消えます。`).addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setValue(p.key).onChange(value=>{p.invalidate();p.key=value.trim();});});
+    new Setting(this.containerEl).setName('保存するキー / Stored secret').setDesc(`${ENDPOINTS[p.settings.endpoint].host} 用。Obsidian の SecretStorage に保存され、data.json には名前だけが入ります。再起動しても残ります。`).addComponent(el=>new SecretComponent(this.app,el).setValue(p.secretName).onChange(async value=>{p.invalidate();p.secretName=asSecretId(value);await p.persist();}));
+    new Setting(this.containerEl).setName('セッションのみのキー / Session-only key').setDesc('メモリのみで再起動すると消えます。上の保存キーより優先されます。').addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setPlaceholder(p.keys[p.settings.endpoint]?'(set)':'(empty)').onChange(value=>{p.invalidate();p.key=value.trim();});});
     new Setting(this.containerEl).setName('除外フォルダ / Excluded folders').setDesc('One vault-relative folder per line').addTextArea(t=>t.setValue(p.settings.folders.join('\n')).onChange(async value=>{const folders=value.split('\n').map(s=>s.trim()).filter(Boolean);if(folders.some(s=>s.includes('..')||s.startsWith('/')||s.includes(':'))){new Notice('Invalid folder path');return;}p.settings.folders=folders.slice(0,100);await p.save();}));
     new Setting(this.containerEl).setName('除外タグ / Excluded tags').addTextArea(t=>t.setValue(p.settings.tags.join('\n')).onChange(async value=>{p.settings.tags=value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,100);await p.save();}));
     new Setting(this.containerEl).setName('索引を再構築 / Rebuild index').addButton(b=>b.setButtonText('Rebuild').onClick(()=>void p.rebuild()));

@@ -45,6 +45,9 @@ implementation gate, and measurements and decisions are appended.
   the third (ADR-012).
 - The Gateway cannot verify the resolved model version, so it is not used as the primary route for
   quality verification.
+- Keys resolve in the order "session override" then "Obsidian SecretStorage". Settings hold only the
+  secret **name**; the value never reaches `data.json`, and it survives a restart (ADR-013). The storage
+  backend and sync behaviour are unverified, so no encryption or non-sync claim is made.
 - Exclusion is applied twice: before indexing and immediately before transmission. Unevaluated
   candidates are not silently dropped.
 - The first version never deletes candidates based on the Jev score. It only reorders them.

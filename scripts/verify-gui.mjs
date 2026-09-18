@@ -37,6 +37,33 @@ export async function verifyGui(port=9222,title='vault - Obsidian',output='.sand
     await client.type('.jev-search input[type="search"]','ZZZunfindable8899');
     await client.wait(`document.querySelectorAll('.jev-search .jev-result').length===0`);
     record('unmatched query renders zero results');await screenshot('04-no-results');
+    // The settings tab is the only place the key-resolution code runs. Obsidian owns the settings
+    // modal in a separate window, so render the registered tab's own container and inspect that.
+    const settings=await client.evaluate(`(async()=>{
+      try{window.app.setting.openTabById('jev-search');}catch(e){}
+      await new Promise(x=>setTimeout(x,600));
+      const e=(window.app.setting.pluginTabs||[]).find(x=>x.id==='jev-search');
+      if(!e||typeof e.display!=='function')return {error:'the plugin setting tab is not registered'};
+      const host=document.createElement('div');host.id='jev-e2e-settings';host.className='jev-search';
+      host.setAttribute('style','position:fixed;inset:0;overflow:auto;background:var(--background-primary);z-index:9999;padding:16px;');
+      document.body.appendChild(host);const original=e.containerEl;e.containerEl=host;
+      try{e.display();}catch(err){e.containerEl=original;host.remove();return {error:'display() threw: '+String(err&&err.message)};}
+      e.containerEl=original;
+      return {text:host.innerText,controls:host.querySelectorAll('input,select,button').length};
+    })()`);
+    if(settings.error)throw Error(settings.error);
+    assert.ok(settings.text.includes('保存するキー'),'The stored-secret control must render');
+    assert.ok(settings.text.includes('セッションのみのキー'),'The session-only control must render');
+    assert.ok(settings.text.includes('接続先'),'The destination control must render');
+    assert.ok(settings.controls>=6,'The settings tab must render its controls');
+    record('settings tab renders the key, destination and exclusion controls',{controls:settings.controls});
+    await screenshot('05-settings');
+    const probe=await client.evaluate(`(async()=>{const p=window.app.plugins.plugins['jev-search'];const id='jev-e2e-probe';window.app.secretStorage.setSecret(id,'probe-value-1234');p.settings.secrets.openrouter=id;const resolved=p.key;await p.persist();return {resolved,listed:window.app.secretStorage.listSecrets().includes(id),inMemory:JSON.stringify(p.settings).includes('probe-value-1234')};})()`);
+    assert.equal(probe.resolved,'probe-value-1234','SecretStorage must resolve the stored secret by name');
+    assert.equal(probe.listed,true,'The probe secret must be listed by SecretStorage');
+    assert.equal(probe.inMemory,false,'The secret value must not appear in plugin settings');
+    record('SecretStorage round-trip resolves the key and keeps the value out of settings');
+    await client.evaluate(`document.getElementById('jev-e2e-settings')?.remove()`);
     assert.equal(client.errors.length,0,'Unexpected renderer exception');
     const external=client.requests.filter(url=>/typesafe|api\.|ai-gateway|vercel/i.test(url));
     assert.deepEqual(external,[],'No external API request may occur without approval');
