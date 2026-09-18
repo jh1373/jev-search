@@ -1,0 +1,25 @@
+{
+  "name": "jev-search",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "author": "jh",
+  "license": "MIT",
+  "description": "Local-first Obsidian search with opt-in Jev reranking",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "build": "node scripts/build.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
+    "test:gui": "node scripts/run-gui-e2e.mjs",
+    "test:bundle": "node scripts/verify-bundle.mjs",
+    "verify": "npm run check && npm run test:bundle"
+  },
+  "engines": {"node": ">=22.18.0"},
+  "devDependencies": {
+    "@types/node": "22.20.3",
+    "esbuild": "0.28.2",
+    "obsidian": "1.13.1",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,11 @@
+# Normalize line endings so Windows, macOS, and Linux checkouts produce identical blobs.
+* text=auto eol=lf
+
+# Keep binary assets untouched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.asar binary

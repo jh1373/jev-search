@@ -1,0 +1,6 @@
+.jev-search input[type=search] { width: 100%; margin-bottom: var(--size-4-2); }
+.jev-result { padding: var(--size-4-3) 0; border-bottom: 1px solid var(--background-modifier-border); }
+.jev-result button { white-space: normal; height: auto; text-align: left; }
+.jev-result small { display: block; color: var(--text-muted); }
+.jev-result p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.jev-preview { max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
