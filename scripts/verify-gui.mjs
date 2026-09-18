@@ -16,8 +16,12 @@ export async function verifyGui(port=9222,title='vault - Obsidian',output='.sand
     await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
     await client.wait(`!!document.querySelector('[aria-label="Jev Search"]')`,30000);
     record('plugin ribbon rendered');
-    await client.click('[aria-label="Jev Search"]');
-    await client.wait(`!!document.querySelector('.jev-search input[type="search"]')`);
+    // The ribbon click can race with workspace layout, so retry before declaring a failure.
+    for(let attempt=0;attempt<3;attempt++){
+      await client.click('[aria-label="Jev Search"]');
+      try{await client.wait(`!!document.querySelector('.jev-search input[type="search"]')`,10000);break;}
+      catch(error){if(attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,1000));}
+    }
     await client.wait(`document.querySelector('.jev-search [role="status"]')?.textContent.includes('Ready')`);
     record('search view rendered and index ready');await screenshot('01-search-ready');
     const plugin=await client.evaluate(`(()=>{const p=window.app.plugins.plugins['jev-search'];return {loaded:!!p,keyPresent:p?!!p.key:null,externalSendingEnabled:p?p.settings.enabled:null,indexed:p?p.index.size:null};})()`);
@@ -75,5 +79,26 @@ export async function verifyGui(port=9222,title='vault - Obsidian',output='.sand
     const report={pass:false,results,error:String(error?.stack??error),rendererErrors:client?.errors??[]};
     await writeFile(`${output}/report.json`,JSON.stringify(report,null,2));throw error;
   } finally {client?.close();}
+}
+/**
+ * Restart check: the secret must still resolve after Obsidian has been fully restarted,
+ * not merely because it was set earlier in the same session.
+ */
+export async function verifySecretPersistence(port=9222){
+  const client=await connectPage(port);
+  try{
+    await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
+    const deadline=Date.now()+25000;let out=null;
+    while(Date.now()<deadline){
+      out=await client.evaluate(`(()=>{const p=window.app.plugins.plugins['jev-search'];if(!p)return null;return {name:p.settings.secrets.openrouter,key:p.key,stored:window.app.secretStorage.getSecret('jev-e2e-probe')};})()`);
+      if(out&&out.name==='jev-e2e-probe'&&out.key)break;
+      await new Promise(resolve=>setTimeout(resolve,300));
+    }
+    assert.equal(out?.name,'jev-e2e-probe','The stored secret name must survive a restart');
+    assert.equal(out?.stored,'probe-value-1234','SecretStorage must return the value after a restart');
+    assert.equal(out?.key,'probe-value-1234','The plugin must resolve the key after a restart');
+    console.log('PASS: the stored secret survives an Obsidian restart');
+    return {name:'the stored secret survives an Obsidian restart',pass:true};
+  } finally { client.close(); }
 }
 if(process.argv.includes('--attach'))await verifyGui();

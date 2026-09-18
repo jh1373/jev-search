@@ -4,7 +4,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, rm, copyFile, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import process from 'node:process';
-import { verifyGui } from './verify-gui.mjs';
+import { verifyGui, verifySecretPersistence } from './verify-gui.mjs';
 
 const ROOT=process.cwd();
 const BASE='.sandbox/gui-e2e';
@@ -32,12 +32,29 @@ await writeFile(`${PROFILE}/obsidian.json`,JSON.stringify({vaults:{jevgui:{path:
 
 let child=spawn(OBSIDIAN,[`--remote-debugging-port=${PORT}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${PROFILE.replace(/\//g,'\\')}`],{detached:true,stdio:'ignore'});
 const stop=()=>{if(!child?.pid)return;try{execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{stdio:'ignore'});}catch{};child=null;};
+// Obsidian flushes SecretStorage asynchronously, so ask it to close normally before forcing it.
+const alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}};
+const gracefulStop=async()=>{
+  if(!child?.pid)return;
+  const pid=child.pid;
+  try{const client=await connectPage(PORT);await client.evaluate(`(()=>{window.close();return true;})()`);client.close();}catch{}
+  const deadline=Date.now()+20000;
+  while(Date.now()<deadline&&alive(pid))await new Promise(resolve=>setTimeout(resolve,500));
+  stop();
+};
 process.on('SIGINT',()=>{stop();process.exit(130);});
 
 let summary;
 try {
   const report=await verifyGui(PORT,'vault - Obsidian',EVIDENCE,'.sandbox/gui-e2e/vault');
-  summary={pass:true,steps:report.results,rendererErrors:report.rendererErrors,observedRequests:report.observedRequests,evidence:EVIDENCE,finishedAt:new Date().toISOString()};
+  const steps=report.results.slice();
+  // Restart Obsidian so the stored secret is proven to survive a real restart, not just an in-memory write.
+  // A forced kill can drop a secret written moments earlier, so close the app normally first.
+  await gracefulStop();
+  await new Promise(resolve=>setTimeout(resolve,3000));
+  child=spawn(OBSIDIAN,[`--remote-debugging-port=${PORT}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${PROFILE.replace(/\//g,'\\')}`],{detached:true,stdio:'ignore'});
+  steps.push(await verifySecretPersistence(PORT));
+  summary={pass:true,steps,rendererErrors:report.rendererErrors,observedRequests:report.observedRequests,evidence:EVIDENCE,finishedAt:new Date().toISOString()};
 } catch (error) {
   summary={pass:false,error:String(error?.stack??error),evidence:EVIDENCE,finishedAt:new Date().toISOString()};
 } finally {
