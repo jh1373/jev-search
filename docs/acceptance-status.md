@@ -34,7 +34,7 @@
 | AT-09 | 一部合格 | `test/jev.test.ts`: 欠損ID、NaN、範囲外、probability不整合、`type` 不一致、`model` 不一致、provider警告を拒否 | HTMLを模擬した値の実機での表示確認 |
 | AT-10 | **合格** | `scripts/verify-integrity.mjs`: 400ノートのSHA-256を起動前と正常終了後で比較。追加・削除・変更いずれも0件 | なし |
 | AT-11 | 一部合格 | [実機負荷試験](benchmark/result-load-10k.md): 実Obsidian 1.13.7・合成10,000ノートで索引完了52.1s→16.4s、UI停止なし（フレーム間隔p95 17〜23ms、200ms超のフレームは各回2回）、ヒープ144〜251MB | 1ノート50MiB級の巨大ノートと、50MiB総量での試験 |
-| AT-12 | 未実施 | — | 100連続変更、再読込/無効化の反復、listener/timer/queueの残存検査 |
+| AT-12 | **合格** | `scripts/verify-at12.mjs`: 20ノートのVaultで100件連続作成→50件編集→25件削除→10件改名。各段階で索引数がディスクと一致（120→95→95）、削除ノートは検索で見つからず、編集ノートは再索引され古い語は消えた。無効化/有効化5回の後も95件で一致、`pending` 0、タイマー残存0 | なし |
 | AT-13 | 未実施 | — | 公開コーパスでの再実行（Phase C。Jev実APIが必要） |
 | AT-14 | 一部合格 | CI（`.github/workflows/ci.yml`）がclean checkoutで `npm ci` → typecheck → test → build → `verify-bundle.mjs` を実行。版は `manifest.json`/`package.json`/`versions.json` で一致 | NOTICE整備と、release成果物の実検査 |
 | AT-15 | 一部合格 | `test/jev.test.ts`: 429の1回再試行、長い `Retry-After` で再試行しないこと、事前取消で送信しないこと、全体4秒の期限 | 実機での4秒超応答、取消連打、物理同時1の確認 |
@@ -46,9 +46,9 @@
 
 ### 合格の内訳
 
-実測で合格: **AT-01, AT-08, AT-10**（3件）
+実測で合格: **AT-01, AT-08, AT-10, AT-12**（4件）
 一部合格: AT-02, AT-03, AT-04, AT-05, AT-07, AT-09, AT-11, AT-14, AT-15, AT-16, AT-19（11件）
-未実施: AT-06, AT-12, AT-13, AT-17, AT-18, AT-20（6件）
+未実施: AT-06, AT-13, AT-17, AT-18, AT-20（5件）
 実施不能: AT-07のDirect経路
 
 ## RV-01〜RV-05
@@ -65,7 +65,7 @@
 
 `docs/design/07-acceptance.md` の規定どおり、**重大要件の未実施が残る版を一般向け安定版として公開しません**。
 
-- AT-06, AT-12, AT-17, AT-18, AT-20 が未実施
+- AT-06, AT-13, AT-17, AT-18, AT-20 が未実施
 - AT-07 のDirect経路が実施不能
 - AT-13（公開コーパスでの再現）が未実施
 
@@ -78,5 +78,6 @@
 npm run verify                              # typecheck, unit tests, build, bundle boundary
 node scripts/verify-integrity.mjs --vault=.sandbox/corpus-small/vault
 node scripts/load-test.mjs --vault=.sandbox/load-vault --profile=.sandbox/load-profile
+node scripts/verify-at12.mjs
 npm run test:gui                            # real-Obsidian GUI E2E, needs a display
 ```

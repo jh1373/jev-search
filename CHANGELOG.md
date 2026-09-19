@@ -42,6 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### AT-12 measured, and a schedule-map leak fixed
+
+- AT-12 now passes in a real Obsidian: 100 rapid creations, 50 edits, 25 deletions and 10 renames left
+  the index at 95 notes, exactly matching the 95 on disk, with the deleted note unfindable, the edited
+  note re-indexed and its old terms discarded. Five disable/enable cycles each rebuilt the same 95
+  notes with no pending work, and no timers were left behind.
+- **Fixed**: the per-path change counter could reuse a stamp after a delete and recreate, which would
+  let a stale queued task overwrite newer state, and the map holding those stamps grew forever because
+  renamed and deleted paths were never removed. Stamps now come from one global counter and dead paths
+  are dropped; after 10 renames the map still held exactly 95 entries.
+- Adds `scripts/verify-at12.mjs`.
+
 ### Large vault measured in the real app
 
 - Indexing 10,000 notes in a real Obsidian took 52.1s and now takes 16.4s. The index yielded to the

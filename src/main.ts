@@ -24,7 +24,7 @@ export default class JevSearch extends Plugin {
    */
   get key(){const session=this.keys[this.settings.endpoint];if(session)return session;const name=this.settings.secrets[this.settings.endpoint];if(!name)return '';try{return this.app.secretStorage.getSecret(name)??'';}catch{return '';}}
   controller:AbortController|null=null; skipped=0; indexed=false;
-  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve(); private yielded=0; private pending=new Set<string>();
+  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve(); private yielded=0; private pending=new Set<string>(); private stamp=0;
   async onload(){
     const raw=await this.loadData();
     if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint),secrets:this.secrets(raw.secrets)};
@@ -35,8 +35,9 @@ export default class JevSearch extends Plugin {
     const changed=(file:TFile)=>{this.index.remove(file.path);this.invalidate();this.schedule(file);};
     this.registerEvent(this.app.vault.on('modify',f=>{if(f instanceof TFile)changed(f);}));
     this.registerEvent(this.app.vault.on('create',f=>{if(f instanceof TFile)changed(f);}));
-    this.registerEvent(this.app.vault.on('delete',f=>{this.updates.set(f.path,(this.updates.get(f.path)??0)+1);this.index.remove(f.path);this.invalidate();}));
-    this.registerEvent(this.app.vault.on('rename',(f,old)=>{this.invalidate();this.index.remove(old);if(f instanceof TFile)this.schedule(f);}));
+    // Dropping the entry both invalidates a queued schedule for this path and keeps the map bounded.
+    this.registerEvent(this.app.vault.on('delete',f=>{this.updates.delete(f.path);this.index.remove(f.path);this.invalidate();}));
+    this.registerEvent(this.app.vault.on('rename',(f,old)=>{this.updates.delete(old);this.invalidate();this.index.remove(old);if(f instanceof TFile)this.schedule(f);}));
     this.registerEvent(this.app.metadataCache.on('changed',f=>changed(f)));
     this.app.workspace.onLayoutReady(()=>{if(this.loaded)void this.rebuild();});
   }
@@ -45,8 +46,9 @@ export default class JevSearch extends Plugin {
   secrets(v:unknown):Record<Target,string>{const source=v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};return {openrouter:asSecretId(source.openrouter),direct:asSecretId(source.direct),gateway:asSecretId(source.gateway)};}
   invalidate(){this.generation++;this.controller?.abort();for(const leaf of this.app.workspace.getLeavesOfType(VIEW)){if(leaf.view instanceof SearchView){leaf.view.invalidate();leaf.view.search();}}}
   eligible(file:TFile){return file.extension==='md'&&file.stat.size<=1048576&&!isExcluded(file.path,[],this.settings.folders,[],this.app.vault.configDir);}
-allowed(file:TFile){const metadata=this.app.metadataCache.getFileCache(file);return this.eligible(file)&&!!metadata&&!isExcluded(file.path,getAllTags(metadata)??[],this.settings.folders,this.settings.tags,this.app.vault.configDir);}
-  schedule(file:TFile){const stamp=(this.updates.get(file.path)??0)+1;this.updates.set(file.path,stamp);this.queue=this.queue.then(async()=>{
+  allowed(file:TFile){const metadata=this.app.metadataCache.getFileCache(file);return this.eligible(file)&&!!metadata&&!isExcluded(file.path,getAllTags(metadata)??[],this.settings.folders,this.settings.tags,this.app.vault.configDir);}
+  // Stamps come from one global counter, so a deleted and recreated path can never reuse a stamp.
+  schedule(file:TFile){const stamp=++this.stamp;this.updates.set(file.path,stamp);this.queue=this.queue.then(async()=>{
     if(!this.loaded||this.updates.get(file.path)!==stamp)return;
     this.index.remove(file.path);
     if(!this.allowed(file)){
