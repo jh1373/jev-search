@@ -77,8 +77,13 @@ try {
   await client.wait('!!document.querySelector(".jev-search input[type=search]")');
 
   let modalClient = null;
+  // Obsidian destroys and recreates the modal window, so a cached connection can go stale mid-run.
   const modal = async () => {
-    if (!modalClient) modalClient = await connectPage(port, { match: 'about:blank', origin: null, probe: '!!document.body' });
+    if (modalClient) {
+      try { await modalClient.evaluate('1'); return modalClient; }
+      catch { try { modalClient.close(); } catch {} modalClient = null; }
+    }
+    modalClient = await connectPage(port, { match: 'about:blank', origin: null, probe: '!!document.body' });
     return modalClient;
   };
   const clickText = async (text) => {
@@ -89,10 +94,11 @@ try {
   };
   // The consent window is reused, so make sure no preview from an earlier scenario is still mounted.
   const ensureNoPreview = async () => {
-    const m = await modal();
     for (let i = 0; i < 25; i++) {
-      if (!await m.evaluate('!!document.querySelector(".jev-preview")')) return true;
-      await m.evaluate('(()=>{document.querySelectorAll(".modal-close-button").forEach(b=>b.click());return true;})()');
+      let open = false;
+      try { open = await (await modal()).evaluate('!!document.querySelector(".jev-preview")'); } catch {}
+      if (!open) return true;
+      await (await modal()).evaluate('(()=>{document.querySelectorAll(".modal-close-button").forEach(b=>b.click());return true;})()');
       await new Promise(r => setTimeout(r, 200));
     }
     return false;
@@ -101,20 +107,36 @@ try {
     try { report.scenarios.push({ name, ...(await fn()) }); }
     catch (e) { report.scenarios.push({ name, error: String(e && e.message) }); }
   };
+  // The preview may be mounted in either window, and the modal connection may have been replaced.
+  const waitPreview = async (timeoutMs = 25000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (await client.evaluate('!!document.querySelector(".jev-preview")')) {
+        return { where: 'main', text: await client.evaluate('document.querySelector(".jev-preview").textContent') };
+      }
+      try {
+        const m = await modal();
+        if (await m.evaluate('!!document.querySelector(".jev-preview")')) {
+          return { where: 'modal', text: await m.evaluate('document.querySelector(".jev-preview").textContent') };
+        }
+      } catch { modalClient = null; }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    const state = await client.evaluate('(()=>{const p=' + P + ';return JSON.stringify({busy:p.busy,hasKey:!!p.key,enabled:p.settings.enabled,controller:!!p.controller,local:(window.app.workspace.getLeavesOfType("jev-search-view")[0]?.view?.local??[]).length});})()');
+    throw new Error('no preview appeared; state ' + state);
+  };
   // Open a fresh preview, approve it, and confirm a request actually went out.
   const rerankAndApprove = async () => {
     const clean = await ensureNoPreview();
     await type('定例会');
     await clickText('Jevで並べ替え');
-    const m = await modal();
-    await m.wait('!!document.querySelector(".jev-preview")', 25000);
-    const preview = await m.evaluate('document.querySelector(".jev-preview").textContent');
+    const { where, text: preview } = await waitPreview();
     const before = await requests();
     const sendWhere = await clickText('送信 / Send');
     let sent = false;
     try { await client.wait('window.__mock.requests.length > ' + before, 8000); sent = true; } catch {}
     const state = JSON.parse(await client.evaluate('(()=>{const p=' + P + ';return JSON.stringify({busy:p.busy,hasKey:!!p.key,enabled:p.settings.enabled,controller:!!p.controller});})()'));
-    return { clean, sendWhere, sent, preview, previewHash: hash(preview), state };
+    return { clean, where, sendWhere, sent, preview, previewHash: hash(preview), state };
   };
   const reset = async (opts = {}) => {
     await client.evaluate('(()=>{Object.assign(window.__mock,{requests:[],mode:"ok",status:200,retryAfter:null,raw:null,delayMs:0,score:2});Object.assign(window.__mock,' + JSON.stringify(opts) + ');return true;})()');
@@ -204,8 +226,7 @@ try {
     const clean = await ensureNoPreview();
     await type('定例会');
     await clickText('Jevで並べ替え');
-    const m = await modal();
-    await m.wait('!!document.querySelector(".jev-preview")', 25000);
+    await waitPreview();
     const removed = await client.evaluate('(async()=>{const f=window.app.vault.getFileByPath("notes/mocknote0.md");if(!f)return "absent";await window.app.vault.delete(f);return "deleted";})()');
     const before = await requests();
     await clickText('送信 / Send');
@@ -218,9 +239,7 @@ try {
     await ensureNoPreview();
     await type('巨大ノート');
     await clickText('Jevで並べ替え');
-    const m = await modal();
-    await m.wait('!!document.querySelector(".jev-preview")', 25000);
-    const preview = await m.evaluate('document.querySelector(".jev-preview").textContent');
+    const { text: preview } = await waitPreview();
     const before = await requests();
     await clickText('送信 / Send');
     await client.wait('window.__mock.requests.length > ' + before, 25000);
@@ -229,10 +248,11 @@ try {
     await new Promise(r => setTimeout(r, 900));
     return {
       candidates: 25,
-      documentsSent: parsed.documents.length,
+      documentsSent: parsed.state.documents.length,
       bytes: Buffer.byteLength(sent),
       withinBudget: Buffer.byteLength(sent) <= 24576,
       previewMatchesSent: preview === sent,
+      budgetStoppedBelowTwenty: parsed.state.documents.length < 20,
       status: await status(),
     };
   });
@@ -249,7 +269,10 @@ try {
     await client.evaluate('(()=>{const i=document.querySelector(".jev-search input[type=search]");i.dispatchEvent(new CompositionEvent("compositionend"));return true;})()');
     await new Promise(r => setTimeout(r, 700));
     const after = await status();
-    return { before, during, after, suppressedWhileComposing: during === before, searchedAfterCommit: (await results()).length > 0 };
+    // invalidate() always rewrites the status on input, so "no search ran" means the status never
+    // reached the result-count form while composing.
+    const counts = s => /chunks/.test(s ?? '');
+    return { before, during, after, searchedWhileComposing: counts(during), searchedAfterCommit: counts(after) };
   });
 
   await step('AT-19 Escape closes the preview without sending', async () => {
@@ -257,11 +280,13 @@ try {
     await ensureNoPreview();
     await type('定例会');
     await clickText('Jevで並べ替え');
+    const { where } = await waitPreview();
     const m = await modal();
-    await m.wait('!!document.querySelector(".jev-preview")', 25000);
     await m.evaluate('(()=>{document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",keyCode:27,which:27,bubbles:true}));return true;})()');
     await new Promise(r => setTimeout(r, 900));
-    return { previewGone: !(await m.evaluate('!!document.querySelector(".jev-preview")')), requests: await requests() };
+    let gone = false;
+    try { gone = !(await m.evaluate('!!document.querySelector(".jev-preview")')); } catch { gone = true; }
+    return { where, previewGone: gone && !(await client.evaluate('!!document.querySelector(".jev-preview")')), requests: await requests() };
   });
 
   await step('AT-19 zoom 200% keeps the view usable', async () => {

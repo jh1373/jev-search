@@ -42,6 +42,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Remaining Jev-path acceptance tests, and a real IME defect
+
+- AT-16 and AT-19 now pass, which leaves no acceptance test unrun: 13 measured passes and 7 partial.
+- **AT-16**: with 25 candidates of about 1,200 characters each, the preview holds **6 documents, not 20**,
+  and the request is 23,718 bytes against the 24,576 ceiling. The preview and the sent body match, and the
+  status reports "Jev ranked · 6 chunks", so the documents left out are visible rather than silent. The
+  implementation caps the request instead of splitting it into batches; the design's three-batch case is
+  therefore handled by stopping, which is recorded rather than glossed over.
+- **AT-19**: a composition now suppresses the search. This was a real defect: `input` fires while
+  an IME is still converting, and the handler scheduled a search anyway, so results flickered against
+  half-composed readings. The view tracks `composing` and waits for `compositionend`. Escape
+  closes the preview without sending, and at 200% zoom the view still searches and renders.
+- The harness also had to learn that Obsidian destroys and recreates the modal window: a cached CDP
+  connection went stale after a few scenarios, which made later previews look like they never opened.
+  It now reconnects and looks for the preview in either window.
+
 ### Re-measured on real Japanese text
 
 - The synthetic corpus was written by the same author as the tokenizer, so it could not show whether the
