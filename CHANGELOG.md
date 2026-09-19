@@ -42,6 +42,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Jev integration verified without a key
+
+- AT-03, AT-04, AT-06, AT-15 and AT-17 now pass. The built bundle calls
+  `(0, import_node_https.request)(...)`, so replacing that property at runtime intercepts every
+  send. `scripts/verify-at-mock.mjs` uses it to drive the plugin against a controlled response, which
+  means response handling, the deadline, cancellation and approval invalidation can all be checked
+  without a key and without sending anything. The real API contract stays a separate question,
+  verified once by AT-07; a mock result is not evidence that the live API behaves this way.
+- Results: the approved preview body and the sent body hash identically (8,656 bytes to
+  https://openrouter.ai/api/alpha/decisions, with the Bearer header attached); a high score reorders
+  and reports "Jev ranked"; every score below 1 keeps the local order; an invalid response falls back
+  with "model-mismatch"; a response that lands after the query changed does not overwrite the view; a
+  hanging response is cut off at 4,497ms; a short Retry-After retries once (2 requests) while a long
+  one stops after 1; ten cancel presses still produce one physical request; deleting a candidate while
+  the preview is open sends nothing.
+- Eleven acceptance tests are now measured passes, eight partial and one unrun (AT-13).
+- Corrects the recorded Obsidian version: the app reports 1.13.4, not 1.13.7.
+- Note for reuse: Obsidian 1.13.4 opens modals in a separate window, so the consent dialog is driven
+  through its own CDP target. `scripts/cdp-client.mjs` now accepts a target selector.
+
 ### Judgement cache and diagnostics
 
 - Implements the designed core/cache. The key is a hash of the request body plus the route and a hash

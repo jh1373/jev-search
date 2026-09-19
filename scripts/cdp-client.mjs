@@ -1,12 +1,20 @@
-export async function connectPage(port) {
+export async function listTargets(port) {
+  try { return await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); } catch { return []; }
+}
+
+export async function connectPage(port, options = {}) {
+  // Obsidian opens modals in a separate window, so callers can select a target other than the main one.
+  const match = options.match ?? 'app://obsidian.md/index.html';
+  const origin = options.origin === undefined ? 'app://obsidian.md' : options.origin;
+  const probe = options.probe ?? '!!(window.app&&window.app.vault&&window.app.workspace&&window.app.plugins)';
   const deadline=Date.now()+30000; let page;
   while(Date.now()<deadline){
     try {const pages=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
       // Target the real Obsidian window, never popups or about:blank debugging targets.
-      page=pages.find(p=>p.type==='page'&&p.url==='app://obsidian.md/index.html');if(page)break;}catch{}
+      page=pages.find(p=>p.type==='page'&&(typeof match==='function'?match(p):p.url===match));if(page)break;}catch{}
     await new Promise(r=>setTimeout(r,200));
   }
-  if(!page)throw Error('Dedicated Obsidian main window not found');
+  if(!page)throw Error('Target window not found: '+String(match));
   const ws=new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
   let id=0;const pending=new Map(),contexts=[],errors=[],requests=[],failedRequests=[];
@@ -22,14 +30,14 @@ export async function connectPage(port) {
   // Wait until the plugin host is actually ready; a fresh window has no title yet.
   let context=null;const readyDeadline=Date.now()+30000;
   while(Date.now()<readyDeadline&&!context){
-    const candidate=contexts.find(c=>c.auxData?.isDefault&&c.origin==='app://obsidian.md');
+    const candidate=contexts.find(c=>c.auxData?.isDefault&&(origin===null||c.origin===origin));
     if(candidate){
-      try{const probe=await call('Runtime.evaluate',{contextId:candidate.id,expression:'!!(window.app&&window.app.vault&&window.app.workspace&&window.app.plugins)',returnByValue:true});
-        if(probe?.result?.value===true)context=candidate;}catch{}
+      try{const ready=await call('Runtime.evaluate',{contextId:candidate.id,expression:probe,returnByValue:true});
+        if(ready?.result?.value===true)context=candidate;}catch{}
     }
     if(!context)await new Promise(r=>setTimeout(r,200));
   }
-  if(!context){ws.close();throw Error('Obsidian app context was not ready');}
+  if(!context){ws.close();throw Error('Context was not ready for '+String(match));}
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{contextId:context.id,expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description??r.exceptionDetails.text);return r.result.value;};
   const wait=async(expression,timeout=20000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('Condition timed out: '+expression);};
   const click=async selector=>{await wait(`!!document.querySelector(${JSON.stringify(selector)})`);const rect=await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,w:r.width,h:r.height};})()`);if(!rect.w||!rect.h)throw Error('Element not visible: '+selector);await call('Input.dispatchMouseEvent',{type:'mousePressed',x:rect.x,y:rect.y,button:'left',clickCount:1});await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:rect.x,y:rect.y,button:'left',clickCount:1});};

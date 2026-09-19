@@ -92,7 +92,7 @@ Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未�
 
 ## 大規模Vaultでの負荷試験（2026-09-19）
 
-合成10,000ノートのVaultを実Obsidian 1.13.7で開き、`scripts/load-test.mjs` で計測しました。
+合成10,000ノートのVaultを実Obsidian 1.13.4で開き、`scripts/load-test.mjs` で計測しました。
 
 | 指標 | 変更前 | 変更後 |
 |---|---|---|

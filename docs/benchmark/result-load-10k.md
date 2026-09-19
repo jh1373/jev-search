@@ -7,7 +7,7 @@
 ## 方法
 
 - Vault: `scripts/gen-corpus.mjs --notes=10000` の決定的な合成Vault（seed 20260919）
-- Obsidian 1.13.7 を新規プロファイルで起動し、`community-plugins.json` に `jev-search` を書いて**起動時に**ロードさせる
+- Obsidian 1.13.4 を新規プロファイルで起動し、`community-plugins.json` に `jev-search` を書いて**起動時に**ロードさせる
 - 索引は `onLayoutReady` から始まるので、`layoutReady` から `plugin.indexed` が真になるまでを計測
 - 同時に `PerformanceObserver`（longtask）と `requestAnimationFrame` の間隔を記録
 - 各条件2〜3回実行し中央値で比較
@@ -69,7 +69,7 @@
 
 - 合成Vaultであり、実Vaultのノート長・リンク密度・タグ分布とは異なる。
 - メタデータ走査との競合はタイミング依存で、実行ごとに完全には統制できていない。
-- Obsidian 1.13.7 と Windows に依存する。
+- Obsidian 1.13.4 と Windows に依存する。
 - ヒープの比較にはObsidian自身のキャッシュが混ざるため、プラグイン単体の使用量ではない。
 - 50ノート未満の小規模Vaultでは、この差は体感できない。
 
