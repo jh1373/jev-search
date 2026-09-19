@@ -42,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### AT-20 measured
+
+- An unknown or hostile settings schema does not crash the plugin and does not destroy the stored
+  file. `scripts/verify-at20.mjs` loads a schema with a non-array `folders`, mixed-type
+  `tags`, a string `enabled`, an array `endpoint`, secrets containing a path traversal,
+  uppercase and a 200-character value, plus unknown keys. Every field falls back to a safe default,
+  local search still works, the renderer reports no exception, and the stored file is byte-identical
+  afterwards. Five acceptance tests are now measured passes.
+
 ### AT-12 measured, and a schedule-map leak fixed
 
 - AT-12 now passes in a real Obsidian: 100 rapid creations, 50 edits, 25 deletions and 10 renames left
