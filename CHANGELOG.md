@@ -47,6 +47,14 @@ waiting list has not opened.
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Review items closed
+
+- **RV-05** is resolved: the nDCG measurement is exactly the number it was waiting on. Because the local
+  stage already returns every relevant candidate for these queries, the gain is purely one of ordering.
+- **RV-03** is recorded as passing, with the honest limit that the number of physical sockets cannot be
+  observed from the renderer. What is measured is one request despite ten cancels, and no follow-up send.
+  Not being able to observe something is not evidence for it.
+
 ### The two live-key tests, measured against the real API
 
 - AT-07 and AT-13 now pass, so **all twenty acceptance tests are measured passes**. The only thing not
