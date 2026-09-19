@@ -65,6 +65,28 @@
 
 修正後は**全実行で「Ready」時点の索引数が10,000件**になった。
 
+## 巨大ノートと容量上限
+
+1ノートあたりの上限は `eligible()` の `stat.size <= 1MiB` です。上限を超えるノートは
+**読まれずに**捨てられ、`oversizedSkipped` に数えられます。実機で確認しました
+（`scripts/verify-at11-large.mjs`）。
+
+| 項目 | 値 |
+|---|---|
+| 巨大ノート1件 | **53,477,421バイト（51MiB）** |
+| 上限内のノート | 55件・合計 **42,737,565バイト（41MiB）**（各約777KB） |
+| 小ノート | 10件 |
+| 索引件数 | **65**（55 + 10） |
+| 上限超過で除外 | **1** |
+| 索引完了 | **2,868ms** |
+| ヒープ | 104MB |
+| フレーム間隔 | p95 44.6ms / 最大 207.8ms / 200ms超 1回（Obsidian自身の起動を含む） |
+| `巨大marker` の検索 | **0件**（除外されたノートは検索できない） |
+| `bulkmarker` の検索 | 50件（検索上限50。55件が該当） |
+
+つまり、51MiBのノートが1件あっても索引は止まらず、上限内の41MiBは3秒弱で入ります。
+**巨大ノートの中身は検索対象になりません**（`stat.size` で拒否するため、そもそも読みません）。
+
 ## 限界
 
 - 合成Vaultであり、実Vaultのノート長・リンク密度・タグ分布とは異なる。
@@ -79,4 +101,5 @@
 node scripts/gen-corpus.mjs --out=.sandbox/load-vault --notes=10000 --clean
 npm run build
 node scripts/load-test.mjs --vault=.sandbox/load-vault --profile=.sandbox/load-profile
+node scripts/verify-at11-large.mjs --out=.sandbox/at11-large.json   # 51MiBの1件と41MiBの総量
 ```

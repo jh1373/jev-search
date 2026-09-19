@@ -42,6 +42,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Exclusion and oversized notes, measured in the real app
+
+- AT-05 and AT-11 now pass, so 17 of the 20 acceptance tests are measured passes and 3 remain partial.
+- **AT-05**: with `private/` and `private2/` excluded by folder and `private@@ by tag, a
+  marker in those notes returns no hits at all, including a note tagged only by an inline `#private` in
+  its body. A marker inside `.obsidian` also returns nothing, and Obsidian's vault API does not even
+  expose that file. The control note is still found, and `allowed()` agrees on all six. The unit tests
+  cover the case the app cannot be asked to change: with the config directory renamed to `Settings`,
+  `Settings/a.md` is excluded and `Settings2/a.md` is not.
+- **AT-11**: a 51MiB note (53,477,421 bytes) is refused on `stat.size` alone, never read, and counted as
+  one oversized skip. 55 notes totalling 41MiB stay under the cap and all index, in 2,868ms with a 104MB
+  heap. The oversized note is unfindable while the others return 50 results. Frame gaps were p95 44.6ms
+  with one 207.8ms frame, during Obsidian's own startup.
+- AT-07 and AT-13 need a live Jev key, and AT-14 needs a real tag and publish.
+
 ### Response validation and result navigation, measured
 
 - AT-09 and AT-02 now pass, so 15 of the 20 acceptance tests are measured passes and 5 remain partial.

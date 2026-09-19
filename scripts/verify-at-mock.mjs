@@ -28,6 +28,17 @@ await writeFile(join(vault, 'notes', 'hostile.md'), '# 敵対的ノート\n<scri
 for (let i = 0; i < 25; i++) {
   await writeFile(join(vault, 'notes', 'bulknote' + i + '.md'), '# 巨大ノート ' + i + '\n巨大ノートの本文。' + '計測用の長い段落をここに置く。'.repeat(120) + '\n');
 }
+// AT-05 fixtures: excluded by folder, by frontmatter tag, by an inline body tag, and inside the config
+// directory. Each carries its own marker so a search can tell which ones were indexed.
+await mkdir(join(vault, 'private'), { recursive: true });
+await mkdir(join(vault, 'private2'), { recursive: true });
+await mkdir(join(vault, '.obsidian'), { recursive: true });
+await writeFile(join(vault, 'private', 'secret.md'), '# 秘密\nfoldermarker の本文。\n');
+await writeFile(join(vault, 'private2', 'secret2.md'), '# 秘密2\nfoldermarker の本文。\n');
+await writeFile(join(vault, 'notes', 'tagged.md'), '---\ntags:\n  - private\n---\n# タグ付き\ntagmarker の本文。\n');
+await writeFile(join(vault, 'notes', 'bodytag.md'), '# 本文タグ\ntagmarker の本文。 #private\n');
+await writeFile(join(vault, '.obsidian', 'hidden.md'), '# 設定内\nconfigmarker の本文。\n');
+await writeFile(join(vault, 'notes', 'allowed.md'), '# 許可\nallowedmarker の本文。\n');
 const pluginDir = join(vault, '.obsidian', 'plugins', 'jev-search');
 await mkdir(pluginDir, { recursive: true });
 for (const file of ['main.js', 'manifest.json', 'styles.css']) await cp(join('dist', file), join(pluginDir, file));
@@ -339,6 +350,29 @@ try {
     return JSON.parse(await client.evaluate('(async()=>{const rows=Array.from(document.querySelectorAll(".jev-result"));const row=rows.find(r=>r.textContent.includes("late.md"));if(!row)return JSON.stringify({found:false,rows:rows.length});const preview=row.querySelector("p")?.textContent??null;row.querySelector("button").click();await new Promise(r=>setTimeout(r,1500));const v=window.app.workspace.activeLeaf&&window.app.workspace.activeLeaf.view;const cursor=v&&v.editor?v.editor.getCursor().line:null;const line=v&&v.editor?v.editor.getLine(cursor):null;return JSON.stringify({found:true,file:v&&v.file?v.file.path:null,cursorLine:cursor,lineAtCursor:line?line.slice(0,30):null,previewStart:preview.slice(0,24)});})()'));
   });
 
+  await step('AT-05 excluded folders, tags and the config directory stay out', async () => {
+    await reset();
+    await client.evaluate('(async()=>{const p=' + P + ';p.settings.folders=["private","private2"];p.settings.tags=["private"];await p.rebuild();return true;})()');
+    await new Promise(r => setTimeout(r, 1500));
+    const probe = term => client.evaluate('(()=>{const p=' + P + ';const hits=p.index.search(' + JSON.stringify(term) + ',50);return JSON.stringify({hits:hits.length,paths:hits.map(h=>h.path)});})()').then(JSON.parse);
+    const allowed = term => client.evaluate('(()=>{const p=' + P + ';const f=window.app.vault.getFileByPath(' + JSON.stringify(term) + ');return JSON.stringify({exists:!!f,allowed:f?p.allowed(f):null});})()').then(JSON.parse);
+    return {
+      folder: await probe('foldermarker'),
+      frontmatterTag: await probe('tagmarker'),
+      configDir: await probe('configmarker'),
+      kept: await probe('allowedmarker'),
+      allowedChecks: {
+        'private/secret.md': await allowed('private/secret.md'),
+        'private2/secret2.md': await allowed('private2/secret2.md'),
+        'notes/tagged.md': await allowed('notes/tagged.md'),
+        'notes/bodytag.md': await allowed('notes/bodytag.md'),
+        '.obsidian/hidden.md': await allowed('.obsidian/hidden.md'),
+        'notes/allowed.md': await allowed('notes/allowed.md'),
+      },
+      indexSize: await client.evaluate(P + '.index.size'),
+    };
+  });
+
   if (modalClient) modalClient.close();
   await client.evaluate('window.close()').catch(() => {});
   client.close();
@@ -348,4 +382,6 @@ try {
   report.error = String(error && error.message);
 } finally { if (!exited) stop(); }
 
+const outArg = process.argv.find(a => a.startsWith('--out='));
+if (outArg) await writeFile(outArg.slice('--out='.length), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
