@@ -19,6 +19,29 @@
 
 **未実施を合格として扱いません。** 単体テストの通過を、実機の受入成功に読み替えません。
 
+## 実APIキーが要る残り2件の手順
+
+AT-07 と AT-13 は**実Jev APIキー**が必要です。キーはチャットにもリポジトリにも置きません。
+ObsidianのSecretStorageに保存し、スクリプトが実行時に読み出して**子プロセスの環境変数としてだけ**渡します。
+
+```
+# 1. 既定プロファイルでObsidianをCDP付きで起動する（既に起動中の場合は先に終了する）
+node scripts/launch-obsidian.mjs 9222
+
+# 2. キーが読めるかを確認する（値は表示されない）
+node scripts/live-with-stored-key.mjs --check
+
+# 3. AT-07: 3条件の実APIテスト
+node scripts/live-with-stored-key.mjs --target=openrouter
+
+# 4. AT-13の残り: Jev投入後のnDCG（公開コーパス、既定40クエリ）
+node scripts/measure-ndcg.mjs --queries=40 --out=.sandbox/wiki/ndcg.json
+```
+
+`live-with-stored-key.mjs` は子プロセスの出力にキーが現れたら**表示を拒否**します。
+`measure-ndcg.mjs` は `OPENROUTER_API_KEY` が無ければ実行を拒否します。
+どちらも実APIを使うので、**合成データと公開コーパスだけ**を送り、個人Vaultは送りません。
+
 ## 検証方法について
 
 Jev連携の受入テスト（AT-03 / AT-04 / AT-06 / AT-15 / AT-17）は、`scripts/verify-at-mock.mjs` が

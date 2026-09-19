@@ -47,6 +47,7 @@ const vault = arg('vault', '.sandbox/wiki/vault');
 const limit = Number(arg('limit', '50'));
 const maxQueries = Number(arg('max-queries', '400'));
 const out = arg('out', '');
+const truthOut = arg('truth-out', '');
 
 const files = await walk(vault);
 const notes = [], texts = new Map(), runsByPath = new Map();
@@ -71,6 +72,7 @@ for (const [word] of chosen) {
   for (const [path, runs] of runsByPath) if (runs.has(word)) relevance.push({ key, path, grade: 2 });
 }
 const truth = { source: 'ja.wikipedia.org katakana words', queries, relevance };
+if (truthOut) await writeFile(truthOut, JSON.stringify(truth, null, 2));
 
 // How much noise the bigram-only view sees for these words: documents sharing a bigram but not the word.
 const bigramOnly = chosen.map(([word]) => {
