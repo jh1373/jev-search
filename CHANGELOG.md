@@ -42,6 +42,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Large vault measured in the real app
+
+- Indexing 10,000 notes in a real Obsidian took 52.1s and now takes 16.4s. The index yielded to the
+  event loop after every note, and that timer cost more than the indexing it protected; it now yields
+  on an 8ms budget. The UI never froze in either case — the p95 frame gap stayed near 60fps and only
+  two frames exceeded 200ms across every run — but p95 did move from 17-18ms to 20-23ms, so the speed
+  is a trade against smoothness, not a free win. Record:
+  [docs/benchmark/result-load-10k.md](docs/benchmark/result-load-10k.md).
+- **Bug found and fixed**: "Ready" was reported before the index was complete. `allowed()` requires a
+  metadata cache entry, and notes whose entry had not resolved yet were skipped silently. One run
+  reported ready with only 6,400 of 10,000 notes indexed. Faster indexing exposed this, because the
+  old 52s build gave Obsidian's metadata scan time to finish. Skipped notes are now tracked and
+  retried before the ready flag is set; every run since reports 10,000 notes at ready.
+- Adds `scripts/load-test.mjs`, which drives a real Obsidian over CDP and samples long tasks, frame
+  gaps and heap while the plugin indexes.
+- Note for anyone reusing the harness: `app.plugins.enablePlugin()` does not load the plugin on a
+  fresh profile. The plugin must be listed in `community-plugins.json` so Obsidian loads it at startup.
+
 ### Retrieval measured
 
 - The local candidate stage was measured on a deterministic synthetic corpus, because Jev can only

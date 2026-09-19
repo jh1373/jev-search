@@ -2,6 +2,8 @@ import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, Secr
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
 import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
 const VIEW='jev-search-view';
+/** Indexing yields to the event loop on this time budget rather than after every note. */
+const YIELD_BUDGET_MS=8;
 type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target;secrets:Record<Target,string>};
 const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter',secrets:{openrouter:'',direct:'',gateway:''}};
 const asTarget=(value:unknown):Target=>value==='direct'?'direct':value==='gateway'?'gateway':'openrouter';
@@ -22,7 +24,7 @@ export default class JevSearch extends Plugin {
    */
   get key(){const session=this.keys[this.settings.endpoint];if(session)return session;const name=this.settings.secrets[this.settings.endpoint];if(!name)return '';try{return this.app.secretStorage.getSecret(name)??'';}catch{return '';}}
   controller:AbortController|null=null; skipped=0; indexed=false;
-  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve();
+  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve(); private yielded=0; private pending=new Set<string>();
   async onload(){
     const raw=await this.loadData();
     if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint),secrets:this.secrets(raw.secrets)};
@@ -42,23 +44,40 @@ export default class JevSearch extends Plugin {
   /** Sanitize stored secret names. A value can never round-trip through here. */
   secrets(v:unknown):Record<Target,string>{const source=v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};return {openrouter:asSecretId(source.openrouter),direct:asSecretId(source.direct),gateway:asSecretId(source.gateway)};}
   invalidate(){this.generation++;this.controller?.abort();for(const leaf of this.app.workspace.getLeavesOfType(VIEW)){if(leaf.view instanceof SearchView){leaf.view.invalidate();leaf.view.search();}}}
-  allowed(file:TFile){const metadata=this.app.metadataCache.getFileCache(file);return file.extension==='md'&&file.stat.size<=1048576&&!!metadata&&!isExcluded(file.path,getAllTags(metadata)??[],this.settings.folders,this.settings.tags,this.app.vault.configDir);}
+  eligible(file:TFile){return file.extension==='md'&&file.stat.size<=1048576&&!isExcluded(file.path,[],this.settings.folders,[],this.app.vault.configDir);}
+allowed(file:TFile){const metadata=this.app.metadataCache.getFileCache(file);return this.eligible(file)&&!!metadata&&!isExcluded(file.path,getAllTags(metadata)??[],this.settings.folders,this.settings.tags,this.app.vault.configDir);}
   schedule(file:TFile){const stamp=(this.updates.get(file.path)??0)+1;this.updates.set(file.path,stamp);this.queue=this.queue.then(async()=>{
     if(!this.loaded||this.updates.get(file.path)!==stamp)return;
-    this.index.remove(file.path);if(!this.allowed(file))return;
+    this.index.remove(file.path);
+    if(!this.allowed(file)){
+      // An eligible note with no metadata cache entry yet is retried once the cache catches up.
+      if(this.eligible(file)&&!this.app.metadataCache.getFileCache(file))this.pending.add(file.path);else this.pending.delete(file.path);
+      return;
+    }
+    this.pending.delete(file.path);
     const mtime=file.stat.mtime;const text=await this.app.vault.cachedRead(file);
     if(!this.loaded||file.stat.mtime!==mtime||this.updates.get(file.path)!==stamp||!this.allowed(file))return;
     this.index.upsert({path:file.path,title:file.basename,text,tags:[]});
-    await new Promise(resolve=>setTimeout(resolve,0));
+    // A timer after every note costs more than the indexing it protects, so yield on a time budget.
+    const now=performance.now();if(now-this.yielded>=YIELD_BUDGET_MS){this.yielded=now;await new Promise(resolve=>setTimeout(resolve,0));}
   }).catch(()=>{if(this.loaded)new Notice('Jev Search: a note could not be indexed.');});}
-  async rebuild(){this.invalidate();this.index.clear();this.skipped=0;this.indexed=false;
+  async rebuild(){this.invalidate();this.index.clear();this.skipped=0;this.indexed=false;this.yielded=0;this.pending.clear();
     for(const file of this.app.vault.getMarkdownFiles()){if(file.stat.size>1048576)this.skipped++;this.schedule(file);}
-    await this.queue;if(this.loaded){this.indexed=true;for(const leaf of this.app.workspace.getLeavesOfType(VIEW))if(leaf.view instanceof SearchView)leaf.view.search();}
+    await this.queue;
+    // Reporting ready while eligible notes are still missing would be wrong, so retry the notes whose
+    // metadata cache entry had not resolved yet before flipping the flag.
+    for(let pass=0;pass<80&&this.loaded&&this.pending.size;pass++){
+      const retry=[...this.pending];
+      await new Promise(resolve=>setTimeout(resolve,250));
+      for(const path of retry){const file=this.app.vault.getFileByPath(path);if(file)this.schedule(file);}
+      await this.queue;
+    }
+    if(this.loaded){this.indexed=true;for(const leaf of this.app.workspace.getLeavesOfType(VIEW))if(leaf.view instanceof SearchView)leaf.view.search();}
   }
   async open(){let leaf=this.app.workspace.getLeavesOfType(VIEW)[0];if(!leaf){leaf=this.app.workspace.getRightLeaf(false)??this.app.workspace.getLeaf(true);await leaf.setViewState({type:VIEW,active:true});}await this.app.workspace.revealLeaf(leaf);}
   async persist(){const snapshot=structuredClone(this.settings);this.saves=this.saves.then(()=>this.saveData(snapshot)).catch(()=>{if(this.loaded)new Notice('Settings could not be saved');});await this.saves;}
   async save(){this.index.clear();this.invalidate();await this.persist();await this.rebuild();}
-  onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();}
+  onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();this.pending.clear();}
 }
 class Consent extends Modal {
   private done=false; private finish:(value:boolean)=>void;
