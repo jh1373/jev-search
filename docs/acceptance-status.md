@@ -40,15 +40,15 @@
 | AT-15 | 一部合格 | `test/jev.test.ts`: 429の1回再試行、長い `Retry-After` で再試行しないこと、事前取消で送信しないこと、全体4秒の期限 | 実機での4秒超応答、取消連打、物理同時1の確認 |
 | AT-16 | 一部合格 | `prepare()` が24KiB上限まで文書を削り、最大20文書に制限。previewに概算コストを表示 | 3バッチ必要時の未送信表示と予算停止の実機確認 |
 | AT-17 | 未実施 | — | preview中の除外変更・本文変更による承認無効化の実機試験 |
-| AT-18 | 未実施 | — | cache/診断/アンインストールの検査 |
+| AT-18 | **合格** | `scripts/verify-at18.mjs`: 判定がキャッシュを往復、TTL 0で無効化、設定変更とアンロードで消去（1→0）、診断オブジェクトにパス・本文・クエリの漏れなし、`data.json` に判定が入らずTTLのみ保存。設定画面にキャッシュTTLと診断コピーが出る | なし |
 | AT-19 | 一部合格 | 実機E2Eで検索入力と結果表示を確認。IMEは `compositionstart`/`compositionend` を実装 | Tab/Esc、ズーム200%、フォーカス復元の実機確認 |
 | AT-20 | **合格** | `scripts/verify-at20.mjs`: 未来版を模した設定（配列でない `folders`、型混在の `tags`、文字列の `enabled`、配列の `endpoint`、パストラバーサル・大文字・200文字の `secrets`、未知キー）を置いて起動。全項目が安全な既定へ落ち、検索は動作し、レンダラ例外0、**保存ファイルは1バイトも変更されず**再解析も可能 | なし |
 
 ### 合格の内訳
 
-実測で合格: **AT-01, AT-08, AT-10, AT-12, AT-20**（5件）
+実測で合格: **AT-01, AT-08, AT-10, AT-12, AT-18, AT-20**（6件）
 一部合格: AT-02, AT-03, AT-04, AT-05, AT-07, AT-09, AT-11, AT-14, AT-15, AT-16, AT-19（11件）
-未実施: AT-06, AT-13, AT-17, AT-18（4件）
+未実施: AT-06, AT-13, AT-17（3件）
 実施不能: AT-07のDirect経路
 
 ## RV-01〜RV-05
@@ -65,7 +65,7 @@
 
 `docs/design/07-acceptance.md` の規定どおり、**重大要件の未実施が残る版を一般向け安定版として公開しません**。
 
-- AT-06, AT-13, AT-17, AT-18 が未実施
+- AT-06, AT-13, AT-17 が未実施
 - AT-07 のDirect経路が実施不能
 - AT-13（公開コーパスでの再現）が未実施
 
@@ -79,6 +79,7 @@ npm run verify                              # typecheck, unit tests, build, bund
 node scripts/verify-integrity.mjs --vault=.sandbox/corpus-small/vault
 node scripts/load-test.mjs --vault=.sandbox/load-vault --profile=.sandbox/load-profile
 node scripts/verify-at12.mjs
+node scripts/verify-at18.mjs
 node scripts/verify-at20.mjs
 npm run test:gui                            # real-Obsidian GUI E2E, needs a display
 ```

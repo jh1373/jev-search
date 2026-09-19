@@ -1,11 +1,14 @@
 import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, SecretComponent, TFile, getAllTags, Notice } from 'obsidian';
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
 import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
+import { JudgementCache, judgementKey } from './core/cache';
 const VIEW='jev-search-view';
 /** Indexing yields to the event loop on this time budget rather than after every note. */
 const YIELD_BUDGET_MS=8;
-type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target;secrets:Record<Target,string>};
-const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter',secrets:{openrouter:'',direct:'',gateway:''}};
+type Settings={folders:string[];tags:string[];enabled:boolean;endpoint:Target;secrets:Record<Target,string>;cacheTtlMinutes:number};
+const DEFAULT:Settings={folders:['Templates','Attachments'],tags:['private','secret'],enabled:false,endpoint:'openrouter',secrets:{openrouter:'',direct:'',gateway:''},cacheTtlMinutes:30};
+/** Cache TTL in minutes. 0 disables the cache; anything outside 0-60 falls back to the default. */
+const asTtl=(value:unknown)=>typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=60?value:DEFAULT.cacheTtlMinutes;
 const asTarget=(value:unknown):Target=>value==='direct'?'direct':value==='gateway'?'gateway':'openrouter';
 /** SecretStorage ids must be lowercase alphanumeric with optional dashes. Only the name is persisted, never the value. */
 const asSecretId=(value:unknown)=>typeof value==='string'&&/^[a-z0-9-]{0,64}$/.test(value)?value:'';
@@ -24,10 +27,11 @@ export default class JevSearch extends Plugin {
    */
   get key(){const session=this.keys[this.settings.endpoint];if(session)return session;const name=this.settings.secrets[this.settings.endpoint];if(!name)return '';try{return this.app.secretStorage.getSecret(name)??'';}catch{return '';}}
   controller:AbortController|null=null; skipped=0; indexed=false;
-  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve(); private yielded=0; private pending=new Set<string>(); private stamp=0;
+  private updates=new Map<string,number>(); private queue:Promise<void>=Promise.resolve(); private saves:Promise<void>=Promise.resolve(); private yielded=0; private pending=new Set<string>(); private stamp=0; cache=new JudgementCache(DEFAULT.cacheTtlMinutes);
   async onload(){
     const raw=await this.loadData();
-    if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint),secrets:this.secrets(raw.secrets)};
+    if(raw&&typeof raw==='object') this.settings={folders:this.list(raw.folders,DEFAULT.folders),tags:this.list(raw.tags,DEFAULT.tags),enabled:raw.enabled===true,endpoint:asTarget(raw.endpoint),secrets:this.secrets(raw.secrets),cacheTtlMinutes:asTtl(raw.cacheTtlMinutes)};
+    this.syncCache();
     this.registerView(VIEW,leaf=>new SearchView(leaf,this));
     this.addRibbonIcon('search','Jev Search',()=>void this.open());
     this.addCommand({id:'open-search',name:'Open search',callback:()=>void this.open()});
@@ -78,8 +82,12 @@ export default class JevSearch extends Plugin {
   }
   async open(){let leaf=this.app.workspace.getLeavesOfType(VIEW)[0];if(!leaf){leaf=this.app.workspace.getRightLeaf(false)??this.app.workspace.getLeaf(true);await leaf.setViewState({type:VIEW,active:true});}await this.app.workspace.revealLeaf(leaf);}
   async persist(){const snapshot=structuredClone(this.settings);this.saves=this.saves.then(()=>this.saveData(snapshot)).catch(()=>{if(this.loaded)new Notice('Settings could not be saved');});await this.saves;}
-  async save(){this.index.clear();this.invalidate();await this.persist();await this.rebuild();}
-  onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();this.pending.clear();}
+  /** The cache follows the configured TTL; changing a setting drops every entry it holds. */
+  syncCache(){this.cache=new JudgementCache(this.settings.cacheTtlMinutes);}
+  /** Counts and versions only. No path, note text, query or key can reach this object. */
+  diagnostics(){return {pluginVersion:this.manifest.version,minAppVersion:this.manifest.minAppVersion,notes:this.index.size,indexed:this.indexed,oversizedSkipped:this.skipped,endpoint:this.settings.endpoint,enabled:this.settings.enabled,excludedFolders:this.settings.folders.length,excludedTags:this.settings.tags.length,cacheEntries:this.cache.size,cacheTtlMinutes:this.settings.cacheTtlMinutes};}
+  async save(){this.index.clear();this.invalidate();this.syncCache();await this.persist();await this.rebuild();}
+  onunload(){this.loaded=false;this.invalidate();this.keys={openrouter:'',direct:'',gateway:''};this.index.clear();this.pending.clear();this.cache.clear();}
 }
 class Consent extends Modal {
   private done=false; private finish:(value:boolean)=>void;
@@ -127,12 +135,17 @@ class SearchView extends ItemView {
     if(!approved||!p.loaded||epoch!==this.epoch||generation!==p.generation||p.busy)return;
     for(const hit of hits.slice(0,prepared.count)){const f=this.app.vault.getFileByPath(hit.path);if(!f||!p.allowed(f)){new Notice('対象が変更されました。再検索してください。');return;}}
     p.busy=true;const controller=new AbortController();p.controller=controller;this.status.setText('Jevへ送信中 / Sending…');
-    try {const r=await evaluate(prepared.body,prepared.count,p.key,controller.signal,p.settings.endpoint);
+    try {
+      // The body is content-addressed, so an edited note or a changed exclusion cannot hit a stale entry.
+      const cacheKey=judgementKey(prepared.body,p.settings.endpoint,p.key);
+      const hit=p.cache.get(cacheKey);const fromCache=hit!==null;
+      const r=hit??(await evaluate(prepared.body,prepared.count,p.key,controller.signal,p.settings.endpoint));
+      if(!fromCache)p.cache.set(cacheKey,r);
       if(!p.loaded||generation!==p.generation||epoch!==this.epoch)return;
       const scores=new Map(hits.slice(0,prepared.count).map((h,i)=>[h.id,r.scores[i]]));
       const ranked=hits.slice(0,prepared.count).sort((a,b)=>scores.get(b.id)!-scores.get(a.id)!);
       const allLow=r.scores.every(s=>s<1);this.render(allLow?this.local:[...ranked,...this.local.slice(prepared.count)],scores);
-      this.status.setText(`${allLow?'関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · input tokens: ${r.inputTokens??'unknown'} · ${costText(r,p.settings.endpoint)}`);
+      this.status.setText(`${allLow?'関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · ${fromCache?'cache hit · no new charge':`input tokens: ${r.inputTokens??'unknown'} · ${costText(r,p.settings.endpoint)}`}`);
     } catch(error){if(p.loaded&&generation===p.generation&&epoch===this.epoch){this.render(this.local);this.status.setText(`Local fallback: ${error instanceof Error?error.message:'failed'}`);}}
     finally{p.busy=false;if(p.controller===controller)p.controller=null;}
   }
@@ -150,6 +163,8 @@ class Preferences extends PluginSettingTab {
     new Setting(this.containerEl).setName('セッションのみのキー / Session-only key').setDesc('メモリのみで再起動すると消えます。上の保存キーより優先されます。').addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setPlaceholder(p.keys[p.settings.endpoint]?'(set)':'(empty)').onChange(value=>{p.invalidate();p.key=value.trim();});});
     new Setting(this.containerEl).setName('除外フォルダ / Excluded folders').setDesc('One vault-relative folder per line').addTextArea(t=>t.setValue(p.settings.folders.join('\n')).onChange(async value=>{const folders=value.split('\n').map(s=>s.trim()).filter(Boolean);if(folders.some(s=>s.includes('..')||s.startsWith('/')||s.includes(':'))){new Notice('Invalid folder path');return;}p.settings.folders=folders.slice(0,100);await p.save();}));
     new Setting(this.containerEl).setName('除外タグ / Excluded tags').addTextArea(t=>t.setValue(p.settings.tags.join('\n')).onChange(async value=>{p.settings.tags=value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,100);await p.save();}));
+    new Setting(this.containerEl).setName('診断をコピー / Copy diagnostics').setDesc('版と計数のみ。ノートのパス・本文・クエリ・キーは含みません。').addButton(b=>b.setButtonText('Copy').onClick(async()=>{const text=JSON.stringify(p.diagnostics(),null,2);try{await navigator.clipboard.writeText(text);new Notice('診断をコピーしました / Diagnostics copied');}catch{new Notice('コピーできませんでした / Copy failed');}}));
+    new Setting(this.containerEl).setName('キャッシュ保持 / Cache TTL').setDesc('同じ問い合わせの再送信を避けます（分、0で無効、既定30）。メモリのみで、ディスクには書きません。').addText(t=>{t.inputEl.type='number';t.inputEl.min='0';t.inputEl.max='60';t.setValue(String(p.settings.cacheTtlMinutes)).onChange(async value=>{const n=Number(value);if(!Number.isInteger(n)||n<0||n>60)return;p.settings.cacheTtlMinutes=n;await p.save();});});
     new Setting(this.containerEl).setName('索引を再構築 / Rebuild index').addButton(b=>b.setButtonText('Rebuild').onClick(()=>void p.rebuild()));
     new Setting(this.containerEl).setName('合成データで接続確認 / Test connection').addButton(b=>b.setButtonText('Preview test').onClick(async()=>{
       if(!p.key||p.busy){new Notice('Key required / request already running');return;}

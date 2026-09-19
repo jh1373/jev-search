@@ -8,10 +8,11 @@
   warnings拒否、取消、4秒期限、限定リトライ。OpenRouterは `usage.cost` があれば実コストとして扱う。
   Gateway は `only:['typesafe-ai']` と `zeroDataRetention:true` を要求し、モデルはヘッダで指定する。
   **ADR-012により OpenRouter が第一経路（既定）**。`provider: {only:['typesafe'],allow_fallbacks:false,zdr:true,data_collection:'deny'}` で経路を固定する。
-- src/main.ts: 検索ビュー、設定（**接続先選択**）、キー解決（**SecretStorage の名前を保持し値は `data.json` に入れない**。
+- src/core/cache.ts: 判定キャッシュ。鍵は**リクエスト本文+接続先+キーのハッシュ**なので、ノート編集・除外変更・候補集合の変化は自動的に別キーになる。TTL 0〜60分（既定30、0で無効）、LRU 200件、メモリのみ。設定変更とアンロードで消去。
+- src/main.ts: 検索ビュー、設定（**接続先選択**、**キャッシュTTL**、**診断コピー**）、キー解決（**SecretStorage の名前を保持し値は `data.json` に入れない**。
   セッション上書きが優先）、全文JSONプレビュー、明示送信、結果並べ替え、フォールバック。
 - scripts/build.mjs: main.js/manifest/stylesとSHA256SUMS生成。
-- 単体29件と生成バンドルのモック読込・検索検査。
+- 単体35件（検索13・Jev通信17・キャッシュ5）と生成バンドルのモック読込・検索検査。
 
 ## 開発・再現
 

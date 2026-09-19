@@ -42,6 +42,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Judgement cache and diagnostics
+
+- Implements the designed core/cache. The key is a hash of the request body plus the route and a hash
+  of the API key, so the body's own content addressing covers note edits, exclusion changes and
+  candidate-set changes: any of them produces a different key and cannot return a stale judgement.
+  The key material is hashed, so the API key never sits in the map. TTL is configurable (0-60
+  minutes, default 30, 0 disables), the LRU holds at most 200 entries, and nothing is written to disk.
+  Failures are never stored, because evaluate() throws rather than returning. The cache is emptied
+  when a setting changes and when the plugin unloads, and a hit reports "cache hit · no new charge"
+  instead of showing a cost that was not incurred.
+- Adds the designed diagnostics export: version and counts only, never a path, note text, query or key.
+- AT-18 now passes in a real Obsidian: a judgement round-trips through the live cache, setting the TTL
+  to 0 empties it, unloading empties it, the diagnostics object leaks neither a path nor body text nor
+  the query, and data.json stores the TTL but no judgement. Six acceptance tests are measured passes.
+- Unit tests: 30 to 35.
+
 ### AT-20 measured
 
 - An unknown or hostile settings schema does not crash the plugin and does not destroy the stored
