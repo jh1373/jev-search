@@ -21,6 +21,7 @@
     "test:load": "node scripts/load-test.mjs",
     "test:at11-large": "node scripts/verify-at11-large.mjs",
     "test:release": "node scripts/verify-release.mjs",
+    "test:release:zip": "node scripts/package-release.mjs",
     "bench:public": "node scripts/fetch-public-corpus.mjs",
     "test:bundle": "node scripts/verify-bundle.mjs",
     "bench:corpus": "node scripts/gen-corpus.mjs",

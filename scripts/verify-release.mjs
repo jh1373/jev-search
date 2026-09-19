@@ -80,10 +80,14 @@ if (tagArg) {
 }
 
 // 5. A release archive, when one is being inspected, must contain exactly the three shipped files.
+// `npm run test:release:zip` packages one first so this can be exercised without publishing.
 const zipArg = process.argv.find(a => a.startsWith('--zip='));
 if (zipArg) {
   const zip = zipArg.slice('--zip='.length);
-  const listing = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).split('\n').map(s => s.trim()).filter(Boolean);
+  // unzip is not present on Windows, but the bundled bsdtar lists a zip just as well.
+  let listing;
+  try { listing = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).split('\n').map(s => s.trim()).filter(Boolean); }
+  catch { listing = execFileSync('tar', ['-tf', zip], { encoding: 'utf8' }).split('\n').map(s => s.trim()).filter(Boolean); }
   const expected = ['main.js', 'manifest.json', 'styles.css'];
   check(JSON.stringify([...listing].sort()) === JSON.stringify([...expected].sort()),
     'archive holds ' + JSON.stringify(listing) + ', expected ' + JSON.stringify(expected));

@@ -42,6 +42,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Release packaging inspected
+
+- AT-14 now passes: 18 measured passes, with AT-07 and AT-13 the only partials left, both waiting on a
+  live Jev key.
+- `npm run test:release:zip` runs the release workflow's own packaging steps on a working machine
+  and inspects the result, so the archive can be checked without tagging. It holds exactly the three
+  files Obsidian loads. `unzip` is absent on Windows, so the listing falls back to the bundled
+  `tar`, which reads a zip.
+- The actual tag and publish are withheld on purpose while two acceptance tests remain partial. That is a
+  policy decision, not a gap in AT-14's criteria (version agreement, no secrets, LICENSE/NOTICE), all of
+  which are verified on a clean checkout in CI.
+- Recorded that the running Obsidian is **1.13.4**, with an update to 1.13.7 staged in the profile but not
+  applied. Every measurement here is on 1.13.4.
+
 ### Exclusion and oversized notes, measured in the real app
 
 - AT-05 and AT-11 now pass, so 17 of the 20 acceptance tests are measured passes and 3 remain partial.
