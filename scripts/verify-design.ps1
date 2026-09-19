@@ -1,6 +1,6 @@
 param([string]$Root = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
-$files = @((Join-Path $Root 'README.md')) + @((Join-Path $Root 'docs\acceptance-status.md')) + @(Get-ChildItem (Join-Path $Root 'docs\design') -Filter '*.md' | ForEach-Object FullName) + @((Join-Path $Root 'docs\privacy.md')) + @((Join-Path $Root 'docs\benchmark\protocol.md'))
+$files = @((Join-Path $Root 'README.md')) + @((Join-Path $Root 'docs\acceptance-status.md')) + @(Get-ChildItem (Join-Path $Root 'docs\design') -Filter '*.md' | ForEach-Object FullName) + @((Join-Path $Root 'docs\privacy.md')) + @((Join-Path $Root 'docs\benchmark\protocol.md')) + @(Get-ChildItem (Join-Path $Root 'docs\benchmark') -Filter 'result-*.md' -File | ForEach-Object FullName)
 $reviewDirectory = Join-Path $Root 'docs\reviews'
 if (Test-Path -LiteralPath $reviewDirectory) {
   $files += @(Get-ChildItem -LiteralPath $reviewDirectory -Filter '*.md' -File | ForEach-Object FullName)

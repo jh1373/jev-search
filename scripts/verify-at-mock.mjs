@@ -21,6 +21,11 @@ const vault = '.sandbox/at-mock-vault', profile = '.sandbox/at-mock-profile', po
 await rm(vault, { recursive: true, force: true });
 await mkdir(join(vault, 'notes'), { recursive: true });
 for (let i = 0; i < 24; i++) await writeFile(join(vault, 'notes', 'mocknote' + i + '.md'), '# 定例会 見出し ' + i + '\n定例会は毎週火曜日です。mockbody' + i + ' の本文。\n');
+// These carry a different term so the other scenarios keep their own candidate set, and they are long
+// enough that twenty of them cannot fit the 24KiB request budget.
+for (let i = 0; i < 25; i++) {
+  await writeFile(join(vault, 'notes', 'bulknote' + i + '.md'), '# 巨大ノート ' + i + '\n巨大ノートの本文。' + '計測用の長い段落をここに置く。'.repeat(120) + '\n');
+}
 const pluginDir = join(vault, '.obsidian', 'plugins', 'jev-search');
 await mkdir(pluginDir, { recursive: true });
 for (const file of ['main.js', 'manifest.json', 'styles.css']) await cp(join('dist', file), join(pluginDir, file));
@@ -206,6 +211,67 @@ try {
     await clickText('送信 / Send');
     await new Promise(r => setTimeout(r, 1500));
     return { clean, removed, newRequests: (await requests()) - before, status: await status() };
+  });
+
+  await step('AT-16 budget stops before twenty candidates', async () => {
+    await reset();
+    await ensureNoPreview();
+    await type('巨大ノート');
+    await clickText('Jevで並べ替え');
+    const m = await modal();
+    await m.wait('!!document.querySelector(".jev-preview")', 25000);
+    const preview = await m.evaluate('document.querySelector(".jev-preview").textContent');
+    const before = await requests();
+    await clickText('送信 / Send');
+    await client.wait('window.__mock.requests.length > ' + before, 25000);
+    const sent = await client.evaluate('window.__mock.requests[0].body');
+    const parsed = JSON.parse(sent);
+    await new Promise(r => setTimeout(r, 900));
+    return {
+      candidates: 25,
+      documentsSent: parsed.documents.length,
+      bytes: Buffer.byteLength(sent),
+      withinBudget: Buffer.byteLength(sent) <= 24576,
+      previewMatchesSent: preview === sent,
+      status: await status(),
+    };
+  });
+
+  await step('AT-19 IME does not search mid-composition', async () => {
+    await reset();
+    await ensureNoPreview();
+    await client.evaluate('(()=>{const i=document.querySelector(".jev-search input[type=search]");i.value="";i.dispatchEvent(new Event("input"));return true;})()');
+    await new Promise(r => setTimeout(r, 600));
+    const before = await status();
+    await client.evaluate('(()=>{const i=document.querySelector(".jev-search input[type=search]");i.dispatchEvent(new CompositionEvent("compositionstart"));i.value="定例会";i.dispatchEvent(new Event("input"));return true;})()');
+    await new Promise(r => setTimeout(r, 700));
+    const during = await status();
+    await client.evaluate('(()=>{const i=document.querySelector(".jev-search input[type=search]");i.dispatchEvent(new CompositionEvent("compositionend"));return true;})()');
+    await new Promise(r => setTimeout(r, 700));
+    const after = await status();
+    return { before, during, after, suppressedWhileComposing: during === before, searchedAfterCommit: (await results()).length > 0 };
+  });
+
+  await step('AT-19 Escape closes the preview without sending', async () => {
+    await reset();
+    await ensureNoPreview();
+    await type('定例会');
+    await clickText('Jevで並べ替え');
+    const m = await modal();
+    await m.wait('!!document.querySelector(".jev-preview")', 25000);
+    await m.evaluate('(()=>{document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",keyCode:27,which:27,bubbles:true}));return true;})()');
+    await new Promise(r => setTimeout(r, 900));
+    return { previewGone: !(await m.evaluate('!!document.querySelector(".jev-preview")')), requests: await requests() };
+  });
+
+  await step('AT-19 zoom 200% keeps the view usable', async () => {
+    await reset();
+    const applied = await client.evaluate('(()=>{try{const {webFrame}=require("electron");webFrame.setZoomFactor(2);return "webFrame";}catch(e){document.body.style.zoom="200%";return "css";}})()');
+    await new Promise(r => setTimeout(r, 400));
+    await type('定例会');
+    const rows = (await results()).length;
+    await client.evaluate('(()=>{try{require("electron").webFrame.setZoomFactor(1);}catch(e){document.body.style.zoom="";}return true;})()');
+    return { applied, rows, status: await status() };
   });
 
   if (modalClient) modalClient.close();

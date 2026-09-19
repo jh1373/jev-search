@@ -42,6 +42,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Re-measured on real Japanese text
+
+- The synthetic corpus was written by the same author as the tokenizer, so it could not show whether the
+  katakana word token helps on prose nobody tuned for. scripts/fetch-public-corpus.mjs now fetches real
+  Japanese Wikipedia introductions, pinning each article's pageid and revid in a manifest so the corpus
+  can be refetched at the same revisions. The text stays in .sandbox/ and is never committed.
+- 806 articles (mean 234 characters) and two query constructions:
+  - A sentence taken verbatim from the article is found almost always: Recall@50 100%, MRR 0.97 under
+    both segmentations. That task cannot separate them, so it is not used to claim anything about quality.
+  - A single katakana loanword as the query, with every document containing that word marked relevant.
+    Here the change is one-directional: Recall@5 46.3% -> 61.0%, Recall@10 62.0% -> 75.3%,
+    MRR 0.384 -> 0.459, median rank 6 -> 4, with **232 of 400 queries improved and none worsened**.
+- The same corpus quantifies why: a median of 112 documents (p90 241, worst 356) share a bigram with the
+  query word without containing it, so the bigram-only view fills the candidate list with プロ-style
+  fragments from プロジェクト and プログラマー.
+- The scope is recorded as narrowly as it was measured: this is a katakana-word query, on short
+  documents, with corpus-derived labels rather than human judgements. Long documents, compounds, kanji
+  and synonym queries are unmeasured, and the nDCG change after Jev still needs a key (AT-13).
+
 ### Release readiness
 
 - Added `NOTICE` and `docs/privacy.md`. The privacy statement says what leaves the machine (only

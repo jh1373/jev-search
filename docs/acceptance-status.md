@@ -46,7 +46,7 @@ Jev連携の受入テスト（AT-03 / AT-04 / AT-06 / AT-15 / AT-17）は、`scr
 | AT-10 | **合格** | `scripts/verify-integrity.mjs`: 400ノートのSHA-256を起動前と正常終了後で比較。追加・削除・変更いずれも0件 | なし |
 | AT-11 | 一部合格 | [実機負荷試験](benchmark/result-load-10k.md): 実Obsidian 1.13.4・合成10,000ノートで索引完了52.1s→16.4s、UI停止なし（フレーム間隔p95 17〜23ms、200ms超のフレームは各回2回）、ヒープ144〜251MB | 1ノート50MiB級の巨大ノートと、50MiB総量での試験 |
 | AT-12 | **合格** | `scripts/verify-at12.mjs`: 20ノートのVaultで100件連続作成→50件編集→25件削除→10件改名。各段階で索引数がディスクと一致（120→95→95）、削除ノートは検索で見つからず、編集ノートは再索引され古い語は消えた。無効化/有効化5回の後も95件で一致、`pending` 0、タイマー残存0 | なし |
-| AT-13 | 未実施 | — | 公開コーパスでの再実行（Phase C。Jev実APIが必要） |
+| AT-13 | 一部合格 | 公開コーパス（ja.wikipedia 806記事・平均234文字、`pageid`/`revid` 固定、hash `bff129d78431da32`）で**ローカル段を再測定**。カタカナ語400問で Recall@5 46.3%→61.0%、MRR 0.384→0.459、**改善232・悪化0**。[記録](benchmark/result-public-corpus.md) | **Jev投入後のnDCG変化**（実APIキーが必要）。全文書・長文での測定 |
 | AT-14 | **合格** | `scripts/verify-release.mjs`: 版が `manifest.json`/`package.json`/`versions.json` で一致、`LICENSE`/`NOTICE` が存在、追跡61ファイルに鍵・メール・個人絶対パスなし。CIがclean checkoutで `npm ci --ignore-scripts` → `npm run check` → `test:bundle` → `test:release` を実行。`release.yml` がタグ時にzipを検査して公開 | 実際のタグ付けと公開操作 |
 | AT-15 | **合格** | `scripts/verify-at-mock.mjs`: 応答しないモックで **4,497ms** で打ち切り `Local fallback: cancelled`、短い `Retry-After` で**2リクエスト**（1回再試行）、長い `Retry-After` で**1リクエスト**で `rate-limit`、取消を10回連打しても**物理リクエストは1**。`test/jev.test.ts` が事前取消も検証 | 実APIでの4秒超応答 |
 | AT-16 | 一部合格 | `prepare()` が24KiB上限まで文書を削り、最大20文書に制限。previewに概算コストを表示 | 3バッチ必要時の未送信表示と予算停止の実機確認 |
@@ -58,8 +58,8 @@ Jev連携の受入テスト（AT-03 / AT-04 / AT-06 / AT-15 / AT-17）は、`scr
 ### 合格の内訳
 
 実測で合格: **AT-01, AT-03, AT-04, AT-06, AT-08, AT-10, AT-12, AT-15, AT-17, AT-18, AT-20**（11件）
-一部合格: AT-02, AT-05, AT-07, AT-09, AT-11, AT-14, AT-16, AT-19（8件）
-未実施: AT-13（1件）
+一部合格: AT-02, AT-05, AT-07, AT-09, AT-11, AT-13, AT-14, AT-16, AT-19（9件）
+未実施: **なし**
 実施不能: AT-07のDirect経路
 
 ## RV-01〜RV-05
@@ -76,9 +76,11 @@ Jev連携の受入テスト（AT-03 / AT-04 / AT-06 / AT-15 / AT-17）は、`scr
 
 `docs/design/07-acceptance.md` の規定どおり、**重大要件の未実施が残る版を一般向け安定版として公開しません**。
 
-- **AT-13（公開コーパスでの再現）が未実施**。G3の要件であり、Jev実APIと公開コーパスが必要
+- **AT-13 の残り（Jev投入後のnDCG変化）が未実施**。G3の要件であり、Jev実APIキーが必要
 - AT-07 のDirect経路が実施不能（TypeSafeのwaitlist待ち）
-- AT-02/05/09/11/16/19 の残作業（上表）
+- AT-02/05/09/11/13/16/19 の残作業（上表）
+
+未実施はゼロになりましたが、**一部合格9件が残る版を安定版として公開しません**。
 
 現在できる主張は「合成Vaultと実Obsidian 1.13.4で、送信0件・Vault無変更・秘密漏れ0件・
 10,000ノートで索引16.4秒・承認した本文と同一の本文だけを送信・4秒で打ち切り・取消を10回連打しても

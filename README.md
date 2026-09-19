@@ -24,11 +24,13 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 10. [日本語評価プロトコル](docs/benchmark/protocol.md)
 11. [レビュー記録・改善バックログ（2026-09-18）](docs/reviews/2026-09-18-product-tradeoffs.md)
 12. [受入テストの実施状況（何が実測で確かめられ、何が未確認か）](docs/acceptance-status.md)
-13. [プライバシー（何が端末外に出て、何が残るか）](docs/privacy.md)
+13. [公開コーパスでの再測定（日本語Wikipedia・実文書）](docs/benchmark/result-public-corpus.md)
+14. [プライバシー（何が端末外に出て、何が残るか）](docs/privacy.md)
 
 受入テスト20件のうち、実測で合格したのは **11件**（AT-01 / AT-03 / AT-04 / AT-06 / AT-08 / AT-10 / AT-12 / AT-15 / AT-17 / AT-18 / AT-20）、
 一部合格が8件、未実施が AT-13 の1件です。
 レビュー5項目のうち RV-04（キー再入力）は解決し、RV-02（候補漏れ）は合成コーパスと公開コーパスで数値を得ました。
+未実施の AT-13 は、公開コーパスでのローカル段再測定まで済んでいます（残りはJev投入後のnDCGで、実APIキーが必要）。
 詳細と残作業は [受入テストの実施状況](docs/acceptance-status.md) にあります。
 
 ## 主要な決定

@@ -106,15 +106,17 @@ class Consent extends Modal {
 
 class SearchView extends ItemView {
   input!:HTMLInputElement; results!:HTMLElement; status!:HTMLElement;
-  local:SearchHit[]=[]; epoch=0; timer:ReturnType<typeof setTimeout>|null=null;
+  local:SearchHit[]=[]; epoch=0; timer:ReturnType<typeof setTimeout>|null=null; composing=false;
   plugin:JevSearch;
   constructor(leaf:WorkspaceLeaf,plugin:JevSearch){super(leaf);this.plugin=plugin;}
   getViewType(){return VIEW;} getDisplayText(){return 'Jev Search';} getIcon(){return 'search';}
   async onOpen(){const root=this.contentEl;root.empty();root.addClass('jev-search');
     this.input=root.createEl('input',{type:'search',placeholder:'ノートを検索 / Search notes',attr:{'aria-label':'Search notes'}});
-    this.registerDomEvent(this.input,'input',()=>{this.invalidate();if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>this.search(),150);});
-    this.registerDomEvent(this.input,'compositionstart',()=>{if(this.timer)clearTimeout(this.timer);});
-    this.registerDomEvent(this.input,'compositionend',()=>this.search());
+    // An IME fires input events while the reading is still being converted, so a search scheduled then
+    // would run against half-composed text and flicker the results. Wait for compositionend instead.
+    this.registerDomEvent(this.input,'input',()=>{this.invalidate();if(this.timer)clearTimeout(this.timer);if(this.composing)return;this.timer=setTimeout(()=>this.search(),150);});
+    this.registerDomEvent(this.input,'compositionstart',()=>{this.composing=true;if(this.timer)clearTimeout(this.timer);});
+    this.registerDomEvent(this.input,'compositionend',()=>{this.composing=false;this.search();});
     new Setting(root).addButton(b=>b.setButtonText('ローカル順').onClick(()=>this.search())).addButton(b=>b.setButtonText('Jevで並べ替え').onClick(()=>void this.rerank())).addButton(b=>b.setButtonText('取消').onClick(()=>{this.plugin.controller?.abort();this.invalidate();}));
     this.status=root.createDiv({attr:{'role':'status','aria-live':'polite'}});this.results=root.createDiv();this.search();
   }

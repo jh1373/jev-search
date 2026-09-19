@@ -25,7 +25,10 @@ const WORD_PREFIX = 'w:';
  * Bigrams alone lose word identity for katakana loanwords: デプロイ becomes デプ / プロ / ロイ, and
  * プロ also occurs in プロジェクト and プログラマー, so its IDF collapses and unrelated notes match.
  * A katakana run is usually one word, so it is emitted as one extra token alongside its bigrams.
- * Measured effect and its limits: docs/benchmark/result-synthetic-recall.md.
+ * On 806 real Japanese Wikipedia introductions with 400 katakana-word queries this raised Recall@5
+ * from 46.3% to 61.0% and improved 232 queries without worsening any; the synthetic corpus alone was
+ * too weak to show it. Measured effect and its limits: docs/benchmark/result-public-corpus.md and
+ * docs/benchmark/result-synthetic-recall.md.
  */
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
