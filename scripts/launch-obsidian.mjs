@@ -1,0 +1,10 @@
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
+const OBSIDIAN='C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const port=process.argv[2]||'9222';
+const profile=process.argv[3];
+const args=['--remote-debugging-port='+port,'--remote-debugging-address=127.0.0.1'];
+if(profile)args.push('--user-data-dir='+resolve(profile).replace(/\//g,'\\'));
+const child=spawn(OBSIDIAN,args,{detached:true,stdio:'ignore'});
+child.unref();
+console.log('launched pid='+child.pid+' args='+JSON.stringify(args));

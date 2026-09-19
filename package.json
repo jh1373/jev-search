@@ -14,6 +14,8 @@
     "check": "npm run typecheck && npm test && npm run build",
     "test:gui": "node scripts/run-gui-e2e.mjs",
     "test:bundle": "node scripts/verify-bundle.mjs",
+    "bench:corpus": "node scripts/gen-corpus.mjs",
+    "bench:recall": "node scripts/measure-recall.mjs",
     "verify": "npm run check && npm run test:bundle"
   },
   "engines": {"node": ">=22.18.0"},
