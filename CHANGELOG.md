@@ -49,6 +49,12 @@ waiting list has not opened.
 
 ### Review items closed
 
+- **RV-01** is resolved: external transmission confirmation fatigue is solved with an industrial-grade
+  hybrid design. Users can toggle "Skip preview until Obsidian closes" directly within the consent modal
+  (in-memory session flag), or toggle "Confirm before transmission" (default: ON) permanently in settings.
+  Security boundaries are strictly preserved: changing excluded folders/tags, changing endpoints/keys,
+  saving settings, or reloading/unloading Obsidian immediately resets the session skip flag. Post-transmission
+  feedback (chunk count, tokens, cache hits, and actual/estimated cost) remains visible in the search status bar.
 - **RV-05** is resolved: the nDCG measurement is exactly the number it was waiting on. Because the local
   stage already returns every relevant candidate for these queries, the gain is purely one of ordering.
 - **RV-03** is recorded as passing, with the honest limit that the number of physical sockets cannot be

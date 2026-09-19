@@ -11,9 +11,15 @@ export async function verifyGui(port=9222,title='vault - Obsidian',output='.sand
     const vaultPath=String(await client.evaluate(`(window.app?.vault?.adapter?.getBasePath?.()??'').replace(/\\\\/g,'/')`));
     if(!vaultPath.endsWith(vaultSuffix))throw Error('Refusing to automate an unexpected vault: '+vaultPath);
     record('dedicated test vault confirmed',{vaultPath});
-    // On a freshly created profile Obsidian may still be finishing plugin startup; enable
-    // our plugin explicitly if it is registered but not yet loaded. Safe: dedicated vault only.
-    await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
+    // If Obsidian presents the initial vault trust dialog ("この保管庫の作成者を信頼しますか？"), trust it.
+    await client.evaluate(`(()=>{
+      const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
+      if (b) b.click();
+      return true;
+    })()`);
+    await new Promise(r => setTimeout(r, 600));
+    const enableRes = await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');return {ok:true};}catch(e){return {ok:false,error:String(e&&e.stack||e)};}}return {ok:true,already:true};})()`);
+    console.log('ENABLE RES:', enableRes);
     await client.wait(`!!document.querySelector('[aria-label="Jev Search"]')`,30000);
     record('plugin ribbon rendered');
     // The ribbon click can race with workspace layout, so retry before declaring a failure.

@@ -61,6 +61,14 @@ const stop = () => { try { execFileSync('taskkill', ['/PID', String(child.pid), 
 const report = { scenarios: [] };
 try {
   const client = await connectPage(port);
+  // Dismiss the initial vault trust dialog if present
+  await client.evaluate(`(()=>{
+    const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
+    if (b) b.click();
+    return true;
+  })()`);
+  await new Promise(r => setTimeout(r, 600));
+  await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
   const P = 'window.app.plugins.plugins["jev-search"]';
   await client.wait(P + '?.indexed === true', 180000);
 
@@ -106,6 +114,12 @@ try {
   };
   const clickText = async (text) => {
     const expr = '(()=>{const b=Array.from(document.querySelectorAll("button")).find(x=>(x.textContent||"").includes(' + JSON.stringify(text) + '));if(!b)return "missing";b.click();return "clicked";})()';
+    if (await client.evaluate(expr) === 'clicked') return 'main';
+    if (await (await modal()).evaluate(expr) === 'clicked') return 'modal';
+    return 'missing';
+  };
+  const clickToggle = async (text) => {
+    const expr = '(()=>{const s=Array.from(document.querySelectorAll(".setting-item")).find(x=>(x.textContent||"").includes(' + JSON.stringify(text) + '));if(!s)return "missing";const t=s.querySelector(".checkbox-container");if(!t)return "no-toggle";t.click();return "clicked";})()';
     if (await client.evaluate(expr) === 'clicked') return 'main';
     if (await (await modal()).evaluate(expr) === 'clicked') return 'modal';
     return 'missing';
@@ -371,6 +385,45 @@ try {
       },
       indexSize: await client.evaluate(P + '.index.size'),
     };
+  });
+
+  await step('RV-01 session skip toggle suppresses subsequent previews', async () => {
+    await reset();
+    await client.evaluate('(()=>{const p=' + P + ';p.sessionSkipConsent=false;p.settings.confirmTransmission=true;return true;})()');
+    await ensureNoPreview();
+    await type('定例会');
+    await clickText('Jevで並べ替え');
+    const { where, text: preview } = await waitPreview();
+    // Toggle the "Obsidianを閉じるまで次回から確認しない" toggle in the modal
+    const toggleWhere = await clickToggle('次回から確認しない');
+    const before = await requests();
+    const sendWhere = await clickText('送信 / Send');
+    await client.wait('window.__mock.requests.length > ' + before, 8000);
+    await client.wait('!' + P + '.busy', 8000);
+    const sessionSkipActive = await client.evaluate(P + '.sessionSkipConsent');
+
+    // Second rerank in same session: preview must NOT appear, request must go out directly
+    await ensureNoPreview();
+    const before2 = await requests();
+    await clickText('Jevで並べ替え');
+    await client.wait('window.__mock.requests.length > ' + before2, 8000);
+    await client.wait('!' + P + '.busy', 8000);
+    const previewNeverAppeared = !(await client.evaluate('!!document.querySelector(".jev-preview")'));
+
+    return { toggleWhere, sendWhere, sessionSkipActive, previewNeverAppeared, requestsSent: 2 };
+  });
+
+  await step('RV-01 confirmTransmission setting toggle permanently suppresses preview', async () => {
+    await reset();
+    await client.evaluate('(()=>{const p=' + P + ';p.sessionSkipConsent=false;p.settings.confirmTransmission=false;return true;})()');
+    await ensureNoPreview();
+    const before = await requests();
+    await type('定例会');
+    await clickText('Jevで並べ替え');
+    await client.wait('window.__mock.requests.length > ' + before, 8000);
+    const previewNeverAppeared = !(await client.evaluate('!!document.querySelector(".jev-preview")'));
+    const statusText = await status();
+    return { previewNeverAppeared, statusText, sentImmediately: true };
   });
 
   if (modalClient) modalClient.close();
