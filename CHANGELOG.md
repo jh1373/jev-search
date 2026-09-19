@@ -42,6 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Response validation and result navigation, measured
+
+- AT-09 and AT-02 now pass, so 15 of the 20 acceptance tests are measured passes and 5 remain partial.
+- **AT-09**: a score outside 0-2, a null score, probabilities that do not form a distribution, and a
+  missing answer are each refused with "Local fallback: invalid-response", and the 23 local results are
+  kept. A note carrying `<script>` and an `onerror` handler renders as text: no script runs,
+  no `img` or `script` element appears in the result list.
+- **AT-02**: clicking a result opens the note and moves the cursor to the **first line of the matching
+  chunk**, which the test confirms at line 314 of a paragraph-separated note whose match is in the second
+  half. The excerpt shown in the result list is the text at that line. The jump is chunk-level, not to the
+  exact matching line, and that distinction is recorded rather than smoothed over.
+
 ### Remaining Jev-path acceptance tests, and a real IME defect
 
 - AT-16 and AT-19 now pass, which leaves no acceptance test unrun: 13 measured passes and 7 partial.

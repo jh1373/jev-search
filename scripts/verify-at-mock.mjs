@@ -21,6 +21,8 @@ const vault = '.sandbox/at-mock-vault', profile = '.sandbox/at-mock-profile', po
 await rm(vault, { recursive: true, force: true });
 await mkdir(join(vault, 'notes'), { recursive: true });
 for (let i = 0; i < 24; i++) await writeFile(join(vault, 'notes', 'mocknote' + i + '.md'), '# 定例会 見出し ' + i + '\n定例会は毎週火曜日です。mockbody' + i + ' の本文。\n');
+// A note carrying an HTML payload, to prove the result list never executes what a note contains.
+await writeFile(join(vault, 'notes', 'hostile.md'), '# 敵対的ノート\n<script>window.__xss=1;</script><img src=x onerror="window.__xss=1"> hostilemarker の本文。\n');
 // These carry a different term so the other scenarios keep their own candidate set, and they are long
 // enough that twenty of them cannot fit the 24KiB request budget.
 for (let i = 0; i < 25; i++) {
@@ -53,7 +55,7 @@ try {
 
   await client.evaluate('(()=>{' +
     'const {EventEmitter}=require("node:events");const https=require("node:https");' +
-    'window.__mock={requests:[],score:2,delayMs:0,mode:"ok",status:200,retryAfter:null,raw:null};' +
+    'window.__mock={requests:[],score:2,delayMs:0,mode:"ok",status:200,retryAfter:null,raw:null,bad:null};' +
     'const dist=s=>s===2?{"0":0,"1":0,"2":1}:s===1?{"0":0.2,"1":0.6,"2":0.2}:{"0":1,"1":0,"2":0};' +
     'https.request=function(url,options,callback){' +
     '  const req=new EventEmitter();let body="";' +
@@ -64,7 +66,12 @@ try {
     '      let payload=window.__mock.raw;' +
     '      if(payload===null){const parsed=JSON.parse(body);const answers={};' +
     '        for(const k of Object.keys(parsed.questions))answers[k]={type:"score",score:window.__mock.score,confidence:0.9,probabilities:dist(window.__mock.score)};' +
-    '        payload=JSON.stringify({model:"typesafe/jev-1.13",answers,usage:{input_tokens:120,cost:0.000005}});}' +
+    '        const keys=Object.keys(answers);const bad=window.__mock.bad;' +
+'        if(bad==="score")for(const k of keys)answers[k].score=5;' +
+'        if(bad==="null-score")for(const k of keys)answers[k].score=null;' +
+'        if(bad==="probabilities")for(const k of keys)answers[k].probabilities={"0":1,"1":1,"2":1};' +
+'        if(bad==="missing")delete answers[keys[0]];' +
+'        payload=JSON.stringify({model:"typesafe/jev-1.13",answers,usage:{input_tokens:120,cost:0.000005}});}' +
     '      callback(res);res.emit("data",Buffer.from(payload));res.emit("end");};' +
     '    setTimeout(send,window.__mock.delayMs);};' +
     '  req.destroy=err=>{req.destroyed=true;if(err)req.emit("error",err);req.emit("close");};' +
@@ -139,7 +146,7 @@ try {
     return { clean, where, sendWhere, sent, preview, previewHash: hash(preview), state };
   };
   const reset = async (opts = {}) => {
-    await client.evaluate('(()=>{Object.assign(window.__mock,{requests:[],mode:"ok",status:200,retryAfter:null,raw:null,delayMs:0,score:2});Object.assign(window.__mock,' + JSON.stringify(opts) + ');return true;})()');
+    await client.evaluate('(()=>{Object.assign(window.__mock,{requests:[],mode:"ok",status:200,retryAfter:null,raw:null,delayMs:0,score:2,bad:null});Object.assign(window.__mock,' + JSON.stringify(opts) + ');return true;})()');
     await client.evaluate('(()=>{const p=' + P + ';p.controller?.abort();p.busy=false;return true;})()');
     await new Promise(r => setTimeout(r, 300));
   };
@@ -297,6 +304,39 @@ try {
     const rows = (await results()).length;
     await client.evaluate('(()=>{try{require("electron").webFrame.setZoomFactor(1);}catch(e){document.body.style.zoom="";}return true;})()');
     return { applied, rows, status: await status() };
+  });
+
+  // AT-09: a response that does not satisfy the contract must be refused, not partially trusted.
+  for (const [label, bad] of [['a score above range', 'score'], ['a null score', 'null-score'], ['probabilities that are not a distribution', 'probabilities'], ['a missing answer', 'missing']]) {
+    await step('AT-09 refuses ' + label, async () => {
+      await reset({ bad });
+      await rerankAndApprove();
+      await new Promise(r => setTimeout(r, 900));
+      const s = await status();
+      return { status: s, refused: /Local fallback/.test(s), rows: (await results()).length };
+    });
+  }
+
+  await step('AT-09 note HTML is text, never executed', async () => {
+    await reset();
+    await ensureNoPreview();
+    await type('hostilemarker');
+    await new Promise(r => setTimeout(r, 500));
+    return JSON.parse(await client.evaluate('(()=>{const row=document.querySelector(".jev-result");return JSON.stringify({xss:window.__xss??null,images:document.querySelectorAll(".jev-result img").length,scripts:document.querySelectorAll(".jev-result script").length,rows:document.querySelectorAll(".jev-result").length,shownAsText:row?row.textContent.includes("<script>"):null});})()'));
+  });
+
+  await step('AT-02 clicking a result opens the note at the matching chunk', async () => {
+    await reset();
+    await ensureNoPreview();
+    // Blank-line separated paragraphs, so the chunker really splits and the matching text lands in a
+    // chunk that does not start at line 1. Without the blank lines the first chunk swallows everything.
+    const before = Array.from({ length: 160 }, (_, i) => '前置き ' + i + ' の段落です。').join('\n\n');
+    const after = Array.from({ length: 60 }, (_, i) => '後書き ' + i + ' の段落です。').join('\n\n');
+    const note = '# 見出し\n\n' + before + '\n\n定例会 latejump の行。\n\n' + after + '\n';
+    await client.evaluate('(async()=>{await window.app.vault.create("notes/late.md", ' + JSON.stringify(note) + ');return true;})()');
+    await new Promise(r => setTimeout(r, 1800));
+    await type('latejump');
+    return JSON.parse(await client.evaluate('(async()=>{const rows=Array.from(document.querySelectorAll(".jev-result"));const row=rows.find(r=>r.textContent.includes("late.md"));if(!row)return JSON.stringify({found:false,rows:rows.length});const preview=row.querySelector("p")?.textContent??null;row.querySelector("button").click();await new Promise(r=>setTimeout(r,1500));const v=window.app.workspace.activeLeaf&&window.app.workspace.activeLeaf.view;const cursor=v&&v.editor?v.editor.getCursor().line:null;const line=v&&v.editor?v.editor.getLine(cursor):null;return JSON.stringify({found:true,file:v&&v.file?v.file.path:null,cursorLine:cursor,lineAtCursor:line?line.slice(0,30):null,previewStart:preview.slice(0,24)});})()'));
   });
 
   if (modalClient) modalClient.close();
