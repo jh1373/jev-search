@@ -1,6 +1,6 @@
 # Jev Search — Development plan and detailed design
 
-Updated: 2026-09-18 / Design version: 0.2 / Status: design draft for starting implementation
+Updated: 2026-09-19 / Design version: 0.2 / Plugin: 0.1.0 / Status: development preview (all 20 acceptance tests measured)
 
 ## Current artifact
 
@@ -27,9 +27,26 @@ Obsidian product.
 9. [Sources, confirmed facts, and open questions](docs/design/08-evidence.md)
 10. [Japanese evaluation protocol](docs/benchmark/protocol.md)
 11. [Review record and improvement backlog (2026-09-18)](docs/reviews/2026-09-18-product-tradeoffs.md)
+12. [Acceptance test status (what is measured and what is not)](docs/acceptance-status.md)
+13. [Re-measurement on a public corpus (Japanese Wikipedia, real text)](docs/benchmark/result-public-corpus.md)
+14. [nDCG after Jev reranking (public corpus, live API)](docs/benchmark/result-ndcg-live.md)
+15. [10,000-note load test](docs/benchmark/result-load-10k.md)
+16. [Privacy (what leaves the machine and what stays)](docs/privacy.md)
 
-The five review items are unverified. They are checked at the start and end of each
-implementation gate, and measurements and decisions are appended.
+All twenty acceptance tests are measured. The one thing that could not be exercised is AT-07's direct
+route, which is unreachable while TypeSafe's waiting list stands; the OpenRouter route passes.
+
+| Measurement | Result |
+|---|---|
+| Sending with Jev off | 0, even with a key present |
+| Indexing 10,000 notes | 52.1s -> **16.4s**, with no UI stall |
+| A 51MiB note | Refused on `stat.size`, never read |
+| Recall@5, katakana queries, 806 public articles | 46.3% -> **61.0%** |
+| nDCG@10 after Jev, 120 queries | 0.5258 -> **0.8788** |
+
+Read the interpretation, the limits, and what was not measured in the linked documents and in the
+[acceptance test status](docs/acceptance-status.md). **Do not use this table alone as evidence of
+accuracy.**
 
 ## Key decisions
 
@@ -82,9 +99,15 @@ request limit.
 ## Tests
 
 ```
-npm run check       # typecheck -> 24 unit tests -> build
-npm run test:bundle # load the generated bundle and run local search
-npm run test:gui    # real Obsidian GUI E2E (dedicated vault, launch to exit, evidence)
+npm run check              # typecheck -> unit tests -> build
+npm run test:bundle        # load the generated bundle and run local search
+npm run test:release       # version agreement, LICENSE/NOTICE, no secrets or personal paths
+npm run test:release:zip   # package and inspect the archive without publishing it
+npm run test:gui           # real Obsidian GUI E2E (dedicated vault, launch to exit, evidence)
+npm run test:mock          # Jev response handling without a live key (controlled transport)
+npm run test:load          # load test with 10,000 synthetic notes
+npm run test:at11-large    # one 51MiB note and 41MiB in total
+npm run test:ndcg          # nDCG after Jev reranking (needs `OPENROUTER_API_KEY`)
 ```
 
 `test:gui` refuses to run outside its dedicated vault and terminates only the process it started.

@@ -1,6 +1,6 @@
 # Jev Search — 開発計画と詳細設計
 
-更新日: 2026-09-18 / 設計版: 0.2 / 状態: 実装開始用設計案
+更新日: 2026-09-19 / 設計版: 0.2 / プラグイン: 0.1.0 / 状態: 開発プレビュー（受入テスト20件を実測で確認済み）
 
 ## 現在の成果物
 
@@ -25,13 +25,25 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 11. [レビュー記録・改善バックログ（2026-09-18）](docs/reviews/2026-09-18-product-tradeoffs.md)
 12. [受入テストの実施状況（何が実測で確かめられ、何が未確認か）](docs/acceptance-status.md)
 13. [公開コーパスでの再測定（日本語Wikipedia・実文書）](docs/benchmark/result-public-corpus.md)
-14. [プライバシー（何が端末外に出て、何が残るか）](docs/privacy.md)
+14. [Jev投入後のnDCG（公開コーパス・実API）](docs/benchmark/result-ndcg-live.md)
+15. [10,000ノート負荷試験](docs/benchmark/result-load-10k.md)
+16. [プライバシー（何が端末外に出て、何が残るか）](docs/privacy.md)
 
-受入テスト20件のうち、実測で合格したのは **11件**（AT-01 / AT-03 / AT-04 / AT-06 / AT-08 / AT-10 / AT-12 / AT-15 / AT-17 / AT-18 / AT-20）、
-一部合格が8件、未実施が AT-13 の1件です。
-レビュー5項目のうち RV-04（キー再入力）は解決し、RV-02（候補漏れ）は合成コーパスと公開コーパスで数値を得ました。
-未実施の AT-13 は、公開コーパスでのローカル段再測定まで済んでいます（残りはJev投入後のnDCGで、実APIキーが必要）。
-詳細と残作業は [受入テストの実施状況](docs/acceptance-status.md) にあります。
+受入テスト20件は**すべて実測で確認済み**です。ただし**AT-07のDirect経路だけは実施不能**です
+（TypeSafeのwaitlist待ち。OpenRouter経路は合格）。未実施・一部合格はありません。
+
+主な実測値:
+
+| 項目 | 結果 |
+|---|---|
+| 既定の外部送信 | 0件（キーがあっても `enabled:false` なら送らない） |
+| 10,000ノートの索引 | 52.1s → **16.4s**（UI停止なし） |
+| 51MiBのノート | `stat.size` で拒否。**読まない** |
+| カタカナ語クエリのRecall@5（公開806記事） | 46.3% → **61.0%** |
+| Jev投入後のnDCG@10（120クエリ） | 0.5258 → **0.8788** |
+
+数値の解釈・限界・未計測範囲は各リンク先と [受入テストの実施状況](docs/acceptance-status.md) にあります。
+**この表だけを「高精度」の根拠にしないでください。**
 
 ## 主要な決定
 
@@ -74,11 +86,15 @@ G0: 合成ノートだけを使う接続スパイク → G1: ローカル検索 
 ## テスト
 
 ```
-npm run check        # 型検査 → 単体35件 → ビルド
-npm run test:bundle  # 生成バンドルの読込・ローカル検索
-npm run test:release # 版一致・LICENSE/NOTICE・秘密/個人パスの混入検査
-npm run test:gui     # 実機Obsidian GUI E2E（専用Vault・起動〜終了・証跡）
-npm run test:mock    # 実APIキーなしでJev応答の扱いを検証（制御したトランスポート）
+npm run check              # 型検査 → 単体テスト → ビルド
+npm run test:bundle        # 生成バンドルの読込・ローカル検索
+npm run test:release       # 版一致・LICENSE/NOTICE・秘密/個人パスの混入検査
+npm run test:release:zip   # 公開ワークフローと同じ手順でzipを作り中身を検査（公開はしない）
+npm run test:gui           # 実機Obsidian GUI E2E（専用Vault・起動〜終了・証跡）
+npm run test:mock          # 実APIキーなしでJev応答の扱いを検証（制御したトランスポート）
+npm run test:load          # 合成10,000ノートの負荷試験
+npm run test:at11-large    # 51MiBの1ノートと41MiB総量
+npm run test:ndcg          # Jev投入後のnDCG（要 `OPENROUTER_API_KEY`）
 ```
 
 `test:gui`は専用Vault以外では実行を拒否し、今回起動したプロセスだけを終了します。
