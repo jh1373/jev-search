@@ -33,5 +33,5 @@ API送信、依存インストール、GitHub公開、Git初期コミットは�
 本文書は設計段階の検査記録です。実装・実機GUI E2Eの結果は
 [開発プレビュー記録](implementation-preview.md) を参照してください。
 実機GUI E2Eは `npm run test:gui` で起動〜終了まで自動実行します。
-Jev実API送信は未実施です。AT-07 は `npm run test:live`（`RUN_LIVE_TESTS=1` とenvキーの2条件を追加で要求）で、
+Jev実API送信は2026-09-19にOpenRouter経由で1回実施し成功しました（合成データ、実コスト$0.000016、詳細は設計書08と開発プレビュー記録）。AT-07 は `npm run test:live`（`RUN_LIVE_TESTS=1` とenvキーの2条件を追加で要求）で、
 ユーザーの端末から合成データ1送信として実行します。キーはチャット・リポジトリ・記録文書へ書きません。

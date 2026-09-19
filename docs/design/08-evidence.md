@@ -42,13 +42,34 @@ Vercel AI Gateway で Jev（`typesafe-ai/jev`）が評価モダリティとし�
 生HTTP（`POST {baseURL}/evaluation-model`、spec version 4）で呼べることをAI SDKソースで確認した。
 consoleのログイン画面だけから「誰でも即キー発行」と判断できない。
 現在の価格が永続する保証も確認できない。
+OpenRouterキーは発行済みで、実機の SecretStorage に保存されている（値は記録しない）。
+
+### 実API確認（2026-09-19、OpenRouter経由・専用Vault・合成データ1送信）
+
+プラグインの「Preview test」から実際に送信し、次を確認した。
+表示は `API OK (openrouter.ai): score 2 / 2 · $0.000016 (actual)`。
+
+| 項目 | 結果 |
+|---|---|
+| 認証・到達 | 成功 |
+| `score` | 2 / 2（「定例会の曜日は？」に対し火曜日を述べる合成文書。設計どおりの最大段階） |
+| `usage.cost` | **返る**（$0.000016 が実コストとして表示された。推定表示ではない） |
+| `confidence` / `probabilities` | **返る**（OpenRouter経路は両者を必須として検証している。欠落なら `invalid-response` で失敗していた） |
+| `model` | `typesafe/jev-1.13` のパターンに一致（日付サフィックスの有無は未確認） |
+| 製品期限4秒 | 超過していない（`evaluate()` が中断せず結果を返した） |
+| `legend` | 未確認（OpenRouter経路では任意として扱っている） |
+| 実レイテンシ | 未計測（4秒未満であることのみ確認） |
+| 応答の完全なshape | 未取得（`npm run test:live` で取得する） |
+
+ADR-012 の前提（版照合が可能・実コストが取得可能・較正分布が得られる）は実測で裏付けられた。
 
 ## G0で解消する保留
 
 | 項目 | 確認手段 | 未解消時 |
 |---|---|---|
 | Electron/requestUrlの応答/取消/redirect | 合成データのObsidian実機試験 | Transport設計再検討、出荷停止 |
-| SecretStorage API・保存保護・同期範囲 | 公開型、公式資料、対応版実機 | セッションメモリのみ |
+| SecretStorage 保存先の実体・同期範囲 | 追加調査 | 暗号化/非同期を宣伝しない（保存と再起動復元は実機確認済み） |
+| OpenRouter実契約（応答shape・実版文字列・legend・レイテンシ） | 合成データの `test:live` | 版照合を緩いパターンのまま維持 |
 | 最低Obsidian版 | 利用APIと互換性試験 | manifest版を確定しない |
 | Gateway実契約（応答shape/rounding/warnings/usage/実版） | 最大3送信の合成API試験(Gateway) | Gateway機能を実験状態に留める |
 | Direct契約（版照合/丸め公差/コンテキスト） | Directキー取得後に合成API試験 | Direct経路を保留 |

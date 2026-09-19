@@ -59,8 +59,14 @@ TypeScriptの実行にはNodeの型除去を使用。node_modulesとdistはGit�
 設定タブは、Obsidian が設定モーダルを別ウィンドウで所有するため、登録済みタブの `containerEl` に対して
 `display()` を実行して検証している。**タブ切替UIそのものは未検証。**
 
+実API確認（2026-09-19、OpenRouter・合成データ1送信）:
+- `API OK (openrouter.ai): score 2 / 2 · $0.000016 (actual)` — 到達・認証・実行時検証・実コスト表示まで成功
+- **`confidence` / `probabilities` / `usage.cost` は実際に返る**（厳格検証を通過し、実コストが表示された）
+- `model` は `typesafe/jev-1.13` に一致。製品期限4秒は超過していない
+
 未検証:
-- Jev実API送信（環境にAPIキー未設定）
+- 応答の完全なshape、`model` の実文字列（日付サフィックスの有無）、`legend` の有無、実レイテンシの数値
+  → `npm run test:live` で取得する
 - 設定変更後の再索引、IME/ズーム/複数ウィンドウ、10kノート負荷
 - SecretStorage の保存先の実体と同期範囲（平文でディスク上に無いことだけ確認済み）
 - **強制終了直後のキー消失**: SecretStorage の書き込みは非同期のため、設定直後のクラッシュでは再入力が必要になり得る

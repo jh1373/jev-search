@@ -42,10 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
-### Not yet done
+### Live API confirmed
 
-- No live API request has been made yet. `probabilities`, `confidence`, `legend`, the exact resolved
-  `model` string, real latency, and `usage.cost` presence are all unconfirmed until AT-07 runs.
+- One synthetic request through OpenRouter from the real plugin returned
+  `API OK (openrouter.ai): score 2 / 2 - $0.000016 (actual)`. This confirms that the route authenticates,
+  that `confidence` and `probabilities` are present (strict validation passed), that `usage.cost` is
+  reported so the actual charge can be shown, that the resolved `model` matches `typesafe/jev-1.13`, and
+  that the response arrives inside the 4 second product deadline.
+- Still unconfirmed: the full response shape, the exact resolved `model` string, whether `legend` is
+  present, and the numeric latency. `npm run test:live` captures these.
 
 ## [0.1.0] - 2026-09-18
 
