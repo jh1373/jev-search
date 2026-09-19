@@ -42,6 +42,7 @@ try {
 
 if (!secret) { console.error('Secret ' + JSON.stringify(chosen) + ' is empty or missing.'); process.exit(3); }
 console.log('using secret ' + JSON.stringify(chosen) + ' (' + secret.length + ' chars) from SecretStorage; value not shown');
+if (process.argv.includes('--check')) { console.log('check only; the live test was not run'); process.exit(0); }
 
 const child = spawnSync(process.execPath, ['scripts/smoke-live.mjs'], {
   env: { ...process.env, RUN_LIVE_TESTS: '1', [keyEnv]: secret, LIVE_TARGET: target },

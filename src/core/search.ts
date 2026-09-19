@@ -15,7 +15,18 @@ export interface SearchHit {
   id: string;
 }
 
-/** NFKC ASCII words and Japanese run bigrams (singletons stay unigrams). */
+/** Prefix for a whole-word token, so it can never collide with a bigram of the same characters. */
+const WORD_PREFIX = 'w:';
+
+/**
+ * NFKC ASCII words, Japanese run bigrams (singletons stay unigrams), and each katakana run as a
+ * whole word.
+ *
+ * Bigrams alone lose word identity for katakana loanwords: デプロイ becomes デプ / プロ / ロイ, and
+ * プロ also occurs in プロジェクト and プログラマー, so its IDF collapses and unrelated notes match.
+ * A katakana run is usually one word, so it is emitted as one extra token alongside its bigrams.
+ * Measured effect and its limits: docs/benchmark/result-synthetic-recall.md.
+ */
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
   const runs = text.normalize('NFKC').toLowerCase().match(
@@ -28,6 +39,7 @@ export function tokenize(text: string): string[] {
       const points = Array.from(run);
       if (points.length === 1) tokens.push(run);
       else for (let i = 1; i < points.length; i++) tokens.push(points[i - 1] + points[i]);
+      for (const span of run.match(/[\p{Script=Katakana}ー]{2,}/gu) ?? []) tokens.push(WORD_PREFIX + span);
     }
   }
   return tokens;
@@ -171,8 +183,10 @@ interface Entry {
   fields: Field[];
 }
 
-function field(text: string): Field {
-  const tokens = tokenize(text);
+export type Tokenizer = (text: string) => string[];
+
+function field(text: string, tokenizer: Tokenizer): Field {
+  const tokens = tokenizer(text);
   const terms = new Map<string, number>();
   for (const token of tokens) terms.set(token, (terms.get(token) ?? 0) + 1);
   return { terms, length: tokens.length };
@@ -180,6 +194,13 @@ function field(text: string): Field {
 
 /** In-memory fielded BM25 over chunks. Exclusion policy is applied by the caller. */
 export class SearchIndex {
+  /** The tokenizer is injectable so alternative segmentations can be measured against the same corpus. */
+  private readonly tokenizer: Tokenizer;
+
+  constructor(tokenizer: Tokenizer = tokenize) {
+    this.tokenizer = tokenizer;
+  }
+
   private readonly notes = new Map<string, string[]>();
   private readonly entries = new Map<string, Entry>();
   private readonly postings: Map<string, Map<string, number>>[] = [new Map(), new Map(), new Map()];
@@ -197,11 +218,11 @@ export class SearchIndex {
     const chunks = fragments(note.text);
     if (!chunks.length) return;
     const ids: string[] = [];
-    const title = field(note.title);
+    const title = field(note.title, this.tokenizer);
     chunks.forEach((chunk, ordinal) => {
       const id = JSON.stringify([note.path, chunk.startLine, ordinal, contentHash(chunk.text)]);
       const hit: SearchHit = { ...chunk, path: note.path, title: note.title, id, score: 0 };
-      const fields = [title, field(chunk.heading), field(chunk.text)];
+      const fields = [title, field(chunk.heading, this.tokenizer), field(chunk.text, this.tokenizer)];
       this.entries.set(id, { hit, fields });
       ids.push(id);
       fields.forEach((value, index) => {
@@ -242,7 +263,7 @@ export class SearchIndex {
   /** OR-match query terms. No per-note cap or external reranking is applied here. */
   search(query: string, limit = 50): SearchHit[] {
     if (Number.isNaN(limit) || limit <= 0 || !this.entries.size) return [];
-    const terms = new Set(tokenize(query));
+    const terms = new Set(this.tokenizer(query));
     if (!terms.size) return [];
     const scores = new Map<string, number>();
     const count = this.entries.size;

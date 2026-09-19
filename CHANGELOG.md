@@ -42,6 +42,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Retrieval measured
+
+- The local candidate stage was measured on a deterministic synthetic corpus, because Jev can only
+  rerank what that stage surfaces. At 10,000 notes, Recall@50 was 68.8% overall, 91.7% when the query
+  reused the note's wording and 45.8% when it did not. Raising the cut to 1,000 still left 18.7%
+  unfound, so fetching more candidates is not a fix. The record is
+  [docs/benchmark/result-synthetic-recall.md](docs/benchmark/result-synthetic-recall.md).
+- Splitting the failures showed two different problems: 6 of 48 queries share no term with their
+  target note at all, so no BM25 variant can find them, while 9 match but rank below the cut (median
+  328th). The vocabulary wall does not move with vault size; the ranking loss does.
+- **ADR-014**: `tokenize` now also emits each katakana run as one word. Bigram splitting turned
+  `デプロイ` into `デプ / プロ / ロイ`, and `プロ` also occurs in `プロジェクト` and
+  `プログラマー`, so the term lost its identity. The predicted failure was repaired at both
+  scales (`デプロイはいつできる` went from 85th to 1st at 10,000 notes and 4th to 1st at 400) and literal
+  MRR rose 0.889 to 0.931. The overall Recall@50 gain is 2.0 points, one query of 48, and zero at 400
+  notes, so it is not treated as statistical evidence and no accuracy claim is made until the real
+  corpus is measured.
+- Unit tests: 29 to 30.
+
 ### Live API confirmed
 
 - One synthetic request through OpenRouter from the real plugin returned

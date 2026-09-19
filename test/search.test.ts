@@ -6,10 +6,20 @@ import type { SearchNote } from '../src/core/search.ts';
 const note = (path: string, text: string, title = ''): SearchNote => ({ path, text, title, tags: [] });
 
 test('tokenize normalizes width/case and uses Japanese code point bigrams only', () => {
-  assert.deepEqual(tokenize('ＢＭ２５ 管理 再ランキング'), ['bm25', '管理', '再ラ', 'ラン', 'ンキ', 'キン', 'ング']);
-  assert.deepEqual(tokenize('Foo_bar １２３ a-b 日 あ カ ｶﾀｶﾅ'), ['foo_bar', '123', 'a', 'b', '日', 'あ', 'カ', 'カタ', 'タカ', 'カナ']);
+  assert.deepEqual(tokenize('ＢＭ２５ 管理 再ランキング'), ['bm25', '管理', '再ラ', 'ラン', 'ンキ', 'キン', 'ング', 'w:ランキング']);
+  assert.deepEqual(tokenize('Foo_bar １２３ a-b 日 あ カ ｶﾀｶﾅ'), ['foo_bar', '123', 'a', 'b', '日', 'あ', 'カ', 'カタ', 'タカ', 'カナ', 'w:カタカナ']);
   assert.deepEqual(tokenize('𠮷野家 😀 ABC'), ['𠮷野', '野家', 'abc']);
   assert.deepEqual(tokenize('! 😀'), []);
+});
+
+test('a katakana run is also one word, and never collides with the bigram of the same characters', () => {
+  // Without the whole-word token, プロ also matches プロジェクト and プログラマー.
+  assert.deepEqual(tokenize('デプロイ'), ['デプ', 'プロ', 'ロイ', 'w:デプロイ']);
+  assert.ok(tokenize('プロジェクト').includes('w:プロジェクト'));
+  // A two-character run would otherwise be indistinguishable from its own bigram.
+  assert.deepEqual(tokenize('メモ'), ['メモ', 'w:メモ']);
+  // A single katakana character is not a word.
+  assert.deepEqual(tokenize('カ'), ['カ']);
 });
 
 test('exclusions use folder/config boundaries, hidden directories, and normalized paths', () => {
