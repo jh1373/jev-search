@@ -47,12 +47,10 @@ const closePreview = async () => {
   return false;
 };
 const apiRequests = () => client.requests.filter(u => u.includes('openrouter.ai'));
-// The plugin sends through Node's https module rather than the renderer's network stack, so CDP's
-// Network domain never sees the request. Counting therefore means wrapping the module property the
-// bundle reads at call time - the same seam the mock harness uses, except that here the real request
-// still goes out. The CDP count is kept alongside it as a cross-check.
-const resetCounter = () => client.evaluate('(()=>{const h=require("node:https");if(!h.__jevOrig){h.__jevOrig=h.request;h.request=function(...a){h.__jevCount++;return h.__jevOrig.apply(this,a);};}h.__jevCount=0;return true;})()');
-const counter = () => client.evaluate('require("node:https").__jevCount');
+// The plugin sends through Obsidian's requestUrl. Counting wraps window.requestUrl
+// while still allowing the real request to proceed.
+const resetCounter = () => client.evaluate('(()=>{if(!window.__jevCountOrig&&typeof window.requestUrl==="function"){window.__jevCountOrig=window.requestUrl;window.requestUrl=function(...a){window.__jevCount=(window.__jevCount||0)+1;return window.__jevCountOrig.apply(this,a);};}window.__jevCount=0;return true;})()');
+const counter = () => client.evaluate('window.__jevCount||0');
 const type = async (text) => {
   await client.evaluate('(()=>{const i=document.querySelector(".jev-search input[type=search]");i.value=' + JSON.stringify(text) + ';i.dispatchEvent(new Event("input"));return true;})()');
   await new Promise(r => setTimeout(r, 1400));

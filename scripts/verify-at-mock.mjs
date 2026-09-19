@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // AT-03 / AT-04 / AT-06 / AT-15 / AT-17 verified against a controlled transport.
 //
-// The bundle calls (0, import_node_https.request)(...), so replacing the module's request property
-// intercepts it. This exercises the plugin's own handling of a response without sending anything or
-// using a key. The real API contract is a separate question (AT-07).
+// The plugin uses Obsidian's official requestUrl via createRequestUrlTransport.
+// Mocking window.requestUrl intercepts all traffic, exercising response handling,
+// retry-after parsing, abort signals, and UI state without real network or API keys.
+// The real API contract is a separate question (AT-07).
 //
 // Obsidian 1.13.4 opens modals in a separate window, so the consent dialog is driven through its own
 // CDP target rather than the main one.
@@ -39,6 +40,7 @@ await writeFile(join(vault, 'notes', 'tagged.md'), '---\ntags:\n  - private\n---
 await writeFile(join(vault, 'notes', 'bodytag.md'), '# 本文タグ\ntagmarker の本文。 #private\n');
 await writeFile(join(vault, '.obsidian', 'hidden.md'), '# 設定内\nconfigmarker の本文。\n');
 await writeFile(join(vault, 'notes', 'allowed.md'), '# 許可\nallowedmarker の本文。\n');
+execFileSync(process.execPath, ['scripts/build.mjs'], { stdio: 'ignore' });
 const pluginDir = join(vault, '.obsidian', 'plugins', 'jev-search');
 await mkdir(pluginDir, { recursive: true });
 for (const file of ['main.js', 'manifest.json', 'styles.css']) await cp(join('dist', file), join(pluginDir, file));
@@ -62,39 +64,57 @@ const report = { scenarios: [] };
 try {
   const client = await connectPage(port);
   // Dismiss the initial vault trust dialog if present
-  await client.evaluate(`(()=>{
-    const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
-    if (b) b.click();
-    return true;
+  for (let i = 0; i < 10; i++) {
+    const clicked = await client.evaluate(`(()=>{
+      const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
+      if (b) { b.click(); return true; }
+      return false;
+    })()`);
+    if (clicked) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  await new Promise(r => setTimeout(r, 1000));
+  const enableRes = await client.evaluate(`(async()=>{
+    const api=window.app.plugins;
+    if(!api.plugins['jev-search']){
+      try {
+        await api.enablePlugin('jev-search');
+        return { ok: true };
+      } catch(e) {
+        return { ok: false, error: String(e && e.stack || e) };
+      }
+    }
+    return { ok: true, already: true };
   })()`);
-  await new Promise(r => setTimeout(r, 600));
-  await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
+  if (!enableRes.ok) {
+    throw new Error('Failed to enable jev-search: ' + enableRes.error);
+  }
   const P = 'window.app.plugins.plugins["jev-search"]';
   await client.wait(P + '?.indexed === true', 180000);
 
   await client.evaluate('(()=>{' +
-    'const {EventEmitter}=require("node:events");const https=require("node:https");' +
     'window.__mock={requests:[],score:2,delayMs:0,mode:"ok",status:200,retryAfter:null,raw:null,bad:null};' +
     'const dist=s=>s===2?{"0":0,"1":0,"2":1}:s===1?{"0":0.2,"1":0.6,"2":0.2}:{"0":1,"1":0,"2":0};' +
-    'https.request=function(url,options,callback){' +
-    '  const req=new EventEmitter();let body="";' +
-    '  req.end=chunk=>{body=String(chunk??"");window.__mock.requests.push({url:String(url),headers:options&&options.headers,body});' +
-    '    if(window.__mock.mode==="hang")return;' +
-    '    const send=()=>{if(req.destroyed)return;const res=new EventEmitter();' +
-    '      res.statusCode=window.__mock.status;res.headers=window.__mock.retryAfter?{"retry-after":window.__mock.retryAfter}:{};' +
-    '      let payload=window.__mock.raw;' +
-    '      if(payload===null){const parsed=JSON.parse(body);const answers={};' +
-    '        for(const k of Object.keys(parsed.questions))answers[k]={type:"score",score:window.__mock.score,confidence:0.9,probabilities:dist(window.__mock.score)};' +
-    '        const keys=Object.keys(answers);const bad=window.__mock.bad;' +
-'        if(bad==="score")for(const k of keys)answers[k].score=5;' +
-'        if(bad==="null-score")for(const k of keys)answers[k].score=null;' +
-'        if(bad==="probabilities")for(const k of keys)answers[k].probabilities={"0":1,"1":1,"2":1};' +
-'        if(bad==="missing")delete answers[keys[0]];' +
-'        payload=JSON.stringify({model:"typesafe/jev-1.13",answers,usage:{input_tokens:120,cost:0.000005}});}' +
-    '      callback(res);res.emit("data",Buffer.from(payload));res.emit("end");};' +
-    '    setTimeout(send,window.__mock.delayMs);};' +
-    '  req.destroy=err=>{req.destroyed=true;if(err)req.emit("error",err);req.emit("close");};' +
-    '  return req;};' +
+    'const mockRequester=async(params)=>{' +
+    '  const body=String(params.body??"");' +
+    '  window.__mock.requests.push({url:String(params.url),headers:params.headers,body});' +
+    '  if(window.__mock.mode==="hang")return new Promise(()=>{});' +
+    '  if(window.__mock.delayMs>0)await new Promise(r=>setTimeout(r,window.__mock.delayMs));' +
+    '  const headers=window.__mock.retryAfter?{"retry-after":String(window.__mock.retryAfter)}:{};' +
+    '  let payload=window.__mock.raw;' +
+    '  if(payload===null){const parsed=JSON.parse(body);const answers={};' +
+    '    for(const k of Object.keys(parsed.questions))answers[k]={type:"score",score:window.__mock.score,confidence:0.9,probabilities:dist(window.__mock.score)};' +
+    '    const keys=Object.keys(answers);const bad=window.__mock.bad;' +
+    '    if(bad==="score")for(const k of keys)answers[k].score=5;' +
+    '    if(bad==="null-score")for(const k of keys)answers[k].score=null;' +
+    '    if(bad==="probabilities")for(const k of keys)answers[k].probabilities={"0":1,"1":1,"2":1};' +
+    '    if(bad==="missing")delete answers[keys[0]];' +
+    '    payload=JSON.stringify({model:"typesafe/jev-1.13",answers,usage:{input_tokens:120,cost:0.000005}});}' +
+    '  let json={};try{json=JSON.parse(payload);}catch{}' +
+    '  return {status:window.__mock.status,headers,arrayBuffer:new ArrayBuffer(0),json,text:payload};' +
+    '};' +
+    'window.requestUrl=mockRequester;' +
+    'try{const obs=require("obsidian");obs.requestUrl=mockRequester;}catch{}' +
     'return true;})()');
 
   // The judgement cache is correct behaviour but would swallow repeated identical scenarios, so these

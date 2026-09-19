@@ -15,12 +15,23 @@ class Plugin {
   addSettingTab(){} registerEvent(event){this.events.push(event);}
 }
 const module={exports:{}};
+let capturedRequestUrlParams = null;
+const requestUrl = async (params) => {
+  capturedRequestUrlParams = params;
+  return {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+    arrayBuffer: new ArrayBuffer(0),
+    json: { answers: { d0: { type: 'score', score: 1.5, confidence: 0.9, probabilities: { 0: 0.1, 1: 0.3, 2: 0.6 } } } },
+    text: '{"answers":{"d0":{"type":"score","score":1.5,"confidence":0.9,"probabilities":{"0":0.1,"1":0.3,"2":0.6}}}}',
+  };
+};
 runInNewContext(readFileSync('dist/main.js','utf8'),{module,exports:module.exports,require:(name)=>{
-  if(name==='obsidian')return {Plugin,ItemView:class{},Modal:class{},PluginSettingTab:class{},Setting:class{},SecretComponent:class{},TFile:class{},Notice:class{}};
-  if(name==='node:https')return nativeRequire(name);
-  // Node builtins available in Obsidian's desktop runtime. Anything else is an unexpected dependency.
+  if(name==='obsidian')return {Plugin,ItemView:class{},Modal:class{},PluginSettingTab:class{},Setting:class{},SecretComponent:class{},TFile:class{},Notice:class{},requestUrl};
+  // node:https is intentionally forbidden. Obsidian requires requestUrl for mobile and guideline compliance.
+  if(name==='node:https'||name==='https')throw Error('node:https is strictly forbidden; requestUrl must be used');
   if(name==='node:crypto')return nativeRequire(name);
-  throw Error('Unexpected runtime dependency');
+  throw Error('Unexpected runtime dependency: '+name);
 },TextEncoder,Buffer,AbortController,setTimeout,clearTimeout,structuredClone});
 const instance=new module.exports.default();
 await instance.onload();
@@ -71,6 +82,15 @@ const instanceNoConfirm=new module.exports.default();
 instanceNoConfirm.loadData=async()=>({confirmTransmission:false});
 await instanceNoConfirm.onload();
 assert.equal(instanceNoConfirm.settings.confirmTransmission,false,'confirmTransmission:false must restore correctly');
+
+// Transport must use requestUrl and not require node:https
+assert.equal(typeof instance.transport, 'function', 'Plugin must expose a transport function');
+const transportRes = await instance.transport('{"query":"test"}', 'test-key', new AbortController().signal);
+assert.equal(transportRes.status, 200);
+assert.ok(capturedRequestUrlParams, 'requestUrl must be invoked by transport');
+assert.equal(capturedRequestUrlParams.headers['Authorization'], 'Bearer test-key');
+assert.equal(capturedRequestUrlParams.method, 'POST');
+assert.equal(capturedRequestUrlParams.throw, false);
 
 instance.index.upsert({path:'Meeting.md',title:'架空チームの会議',text:'# 定例会\n定例会は毎週火曜日です。',tags:[]});
 instance.index.upsert({path:'Cooking.md',title:'料理',text:'夕食にカレーを作ります。',tags:[]});

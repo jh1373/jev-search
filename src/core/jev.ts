@@ -1,4 +1,3 @@
-import { request } from 'node:https';
 /** Fixed destinations only. No arbitrary base URL is configurable. */
 export type Target = 'openrouter' | 'direct' | 'gateway';
 export const MODEL = 'jev-1.13.0';
@@ -95,24 +94,9 @@ export function validate(raw:unknown,count:number,target:Target='openrouter'):Ju
   }
   return {scores,inputTokens,cost};
 }
-export type Transport = (body:string,key:string,signal:AbortSignal,endpoint?:Endpoint)=>Promise<{status:number;retryAfter?:string;body:string}>;
-export const transport:Transport=(body,key,signal,endpoint)=>new Promise((resolve,reject)=>{
-  const target=endpoint??requestFor('direct');
-  if(signal.aborted){reject(new Error('cancelled'));return;}
-  const req=request(target.url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','Content-Length':Buffer.byteLength(body),...target.headers}},res=>{
-    // node:https never follows redirects. Never forward credentials to another host.
-    const chunks:Buffer[]=[];let size=0;
-    res.on('data',(chunk:Buffer)=>{size+=chunk.length;if(size>1048576){req.destroy();reject(new Error('response-too-large'));}else chunks.push(chunk);});
-    res.on('end',()=>resolve({status:res.statusCode??0,retryAfter:res.headers['retry-after'],body:Buffer.concat(chunks).toString('utf8')}));
-    res.on('error',()=>reject(new Error('network')));
-  });
-  const abort=()=>req.destroy(new Error('cancelled'));
-  signal.addEventListener('abort',abort,{once:true});
-  req.on('close',()=>signal.removeEventListener('abort',abort));
-  req.on('error',()=>reject(new Error(signal.aborted?'cancelled':'network')));
-  req.end(body);
-});
-export async function evaluate(body:string,count:number,key:string,signal:AbortSignal,target:Target='openrouter',send:Transport=transport):Promise<Judgement> {
+export type TransportResponse = { status: number; retryAfter?: string; body: string };
+export type Transport = (body: string, key: string, signal: AbortSignal, endpoint?: Endpoint) => Promise<TransportResponse>;
+export async function evaluate(body: string, count: number, key: string, signal: AbortSignal, target: Target = 'openrouter', send: Transport): Promise<Judgement> {
   if(!key.trim())throw new Error('missing-key');
   const controller=new AbortController();const abort=()=>controller.abort();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
   const deadline=Date.now()+4000;const timer=setTimeout(abort,4000);

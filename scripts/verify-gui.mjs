@@ -12,12 +12,16 @@ export async function verifyGui(port=9222,title='vault - Obsidian',output='.sand
     if(!vaultPath.endsWith(vaultSuffix))throw Error('Refusing to automate an unexpected vault: '+vaultPath);
     record('dedicated test vault confirmed',{vaultPath});
     // If Obsidian presents the initial vault trust dialog ("この保管庫の作成者を信頼しますか？"), trust it.
-    await client.evaluate(`(()=>{
-      const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
-      if (b) b.click();
-      return true;
-    })()`);
-    await new Promise(r => setTimeout(r, 600));
+    for (let i = 0; i < 10; i++) {
+      const clicked = await client.evaluate(`(()=>{
+        const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
+        if (b) { b.click(); return true; }
+        return false;
+      })()`);
+      if (clicked) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    await new Promise(r => setTimeout(r, 1000));
     const enableRes = await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');return {ok:true};}catch(e){return {ok:false,error:String(e&&e.stack||e)};}}return {ok:true,already:true};})()`);
     console.log('ENABLE RES:', enableRes);
     await client.wait(`!!document.querySelector('[aria-label="Jev Search"]')`,30000);

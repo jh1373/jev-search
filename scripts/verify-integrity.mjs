@@ -43,6 +43,7 @@ async function hashVault() {
 const before = await hashVault();
 const beforeFiles = Object.keys(before);
 
+execFileSync(process.execPath, ['scripts/build.mjs'], { stdio: 'ignore' });
 const pluginDir = join(vault, '.obsidian', 'plugins', 'jev-search');
 await mkdir(pluginDir, { recursive: true });
 for (const file of ['main.js', 'manifest.json', 'styles.css']) await cp(join('dist', file), join(pluginDir, file));
@@ -65,18 +66,34 @@ const forceStop = () => { try { execFileSync('taskkill', ['/PID', String(child.p
 const report = { vault, dummy: 'written, value not printed' };
 try {
   const client = await connectPage(port);
+  // Dismiss the initial vault trust dialog if present
+  for (let i = 0; i < 10; i++) {
+    const clicked = await client.evaluate(`(()=>{
+      const b = Array.from(document.querySelectorAll('button')).find(el => (el.textContent||'').includes('信頼') || (el.textContent||'').includes('Trust'));
+      if (b) { b.click(); return true; }
+      return false;
+    })()`);
+    if (clicked) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  await new Promise(r => setTimeout(r, 1000));
+  await client.evaluate(`(async()=>{const api=window.app.plugins;if(!api.plugins['jev-search']){try{await api.enablePlugin('jev-search');}catch(e){}}return true;})()`);
   await client.wait('window.app?.plugins?.plugins["jev-search"]?.indexed === true', 240000);
   report.indexedNotes = await client.evaluate('window.app.plugins.plugins["jev-search"].index.size');
 
-  // AT-01: count outbound HTTP from the renderer's own Node realm, if it is reachable.
-  report.requireReachable = await client.evaluate('typeof require === "function"');
-  if (report.requireReachable) {
-    await client.evaluate('(()=>{const https=require("node:https"),http=require("node:http");' +
-      'window.__net={https:[],http:[]};' +
-      'for(const [mod,key] of [[https,"https"],[http,"http"]]){const original=mod.request;' +
-      'mod.request=function(...args){try{window.__net[key].push(String(args[0]?.hostname??args[0]??""));}catch(e){}return original.apply(this,args);};}' +
-      'return true;})()');
-  }
+  // AT-01: count outbound HTTP/HTTPS and requestUrl from renderer
+  await client.evaluate('(()=>{' +
+    'window.__net={https:[],http:[],requestUrl:[]};' +
+    'try{' +
+    '  const https=require("node:https"),http=require("node:http");' +
+    '  for(const [mod,key] of [[https,"https"],[http,"http"]]){const original=mod.request;' +
+    '  mod.request=function(...args){try{window.__net[key].push(String(args[0]?.hostname??args[0]??""));}catch(e){}return original.apply(this,args);};}' +
+    '}catch{}' +
+    'if(typeof window.requestUrl==="function"){' +
+    '  const origRequestUrl=window.requestUrl;' +
+    '  window.requestUrl=function(...args){try{const u=args[0]?.url??args[0]??"";window.__net.requestUrl.push(String(u));}catch(e){}return origRequestUrl.apply(this,args);};' +
+    '}' +
+    'return true;})()');
 
   // Run real local searches through the shipped index, including queries from the corpus.
   const truthPath = join(vault, '..', 'ground-truth.json');
@@ -94,7 +111,7 @@ try {
   await new Promise(r => setTimeout(r, 1500));
   report.secretReadBack = await client.evaluate('window.app.secretStorage.getSecret("jev-integrity-dummy") === ' + JSON.stringify(DUMMY));
   report.settingsText = await client.evaluate('JSON.stringify(window.app.plugins.plugins["jev-search"].settings)');
-  report.net = report.requireReachable ? JSON.parse(await client.evaluate('JSON.stringify(window.__net)')) : null;
+  report.net = JSON.parse(await client.evaluate('JSON.stringify(window.__net ?? null)'));
   report.cdpRequests = client.requests.filter(u => /openrouter|typesafe|gateway|api\./.test(u));
 
   // AT-10 needs a clean exit so the vault state is the plugin's, not the killer's.

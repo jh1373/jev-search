@@ -1,6 +1,7 @@
-import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, SecretComponent, TFile, getAllTags, Notice } from 'obsidian';
+import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, SecretComponent, TFile, getAllTags, Notice, requestUrl } from 'obsidian';
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
-import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target } from './core/jev';
+import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target, type Transport } from './core/jev';
+import { createRequestUrlTransport } from './adapters/transport';
 import { JudgementCache, judgementKey } from './core/cache';
 const VIEW='jev-search-view';
 /** Indexing yields to the event loop on this time budget rather than after every note. */
@@ -17,6 +18,8 @@ const modelName=(target:Target)=>target==='direct'?MODEL:target==='openrouter'?O
 const costText=(r:{inputTokens:number|null;cost:number|null},target:Target)=>r.cost!==null?`$${r.cost.toFixed(6)} (actual)`:(r.inputTokens===null?'$unknown':`$${(r.inputTokens*PRICE_PER_MTOK[target]/1e6).toFixed(6)} (est.)`);
 export default class JevSearch extends Plugin {
   index=new SearchIndex(); settings:Settings={...DEFAULT}; keys:Record<Target,string>={openrouter:'',direct:'',gateway:''}; generation=0; loaded=true; busy=false;
+  /** Injected network transport. Defaults to Obsidian's official requestUrl adapter. */
+  transport:Transport=createRequestUrlTransport((params)=>((globalThis as any).requestUrl??requestUrl)(params));
   /** In-memory session toggle: skip transmission preview modal until Obsidian unloads or settings change. */
   sessionSkipConsent=false;
   /** Session override for the current destination; cleared on unload. */
@@ -154,7 +157,7 @@ class SearchView extends ItemView {
       // The body is content-addressed, so an edited note or a changed exclusion cannot hit a stale entry.
       const cacheKey=judgementKey(prepared.body,p.settings.endpoint,p.key);
       const hit=p.cache.get(cacheKey);const fromCache=hit!==null;
-      const r=hit??(await evaluate(prepared.body,prepared.count,p.key,controller.signal,p.settings.endpoint));
+      const r=hit??(await evaluate(prepared.body,prepared.count,p.key,controller.signal,p.settings.endpoint,p.transport));
       if(!fromCache)p.cache.set(cacheKey,r);
       if(!p.loaded||generation!==p.generation||epoch!==this.epoch)return;
       const scores=new Map(hits.slice(0,prepared.count).map((h,i)=>[h.id,r.scores[i]]));
@@ -186,7 +189,7 @@ class Preferences extends PluginSettingTab {
       if(!p.key||p.busy){new Notice('Key required / request already running');return;}
       const prepared=prepare('定例会の曜日は？',[{title:'架空チーム',heading:'会議',text:'定例会は毎週火曜日です。'}],p.settings.endpoint);const generation=p.generation;
       if(!await new Promise<boolean>(resolve=>new Consent(p,prepared.body,approved=>resolve(approved)).open())||p.busy||!p.loaded||p.generation!==generation)return;
-      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · ${costText(r,p.settings.endpoint)}`);}catch{if(p.loaded)new Notice('接続確認失敗。キー・ネットワーク・モデルを確認してください。');}finally{p.busy=false;p.controller=null;}
+      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint,p.transport);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · ${costText(r,p.settings.endpoint)}`);}catch{if(p.loaded)new Notice('接続確認失敗。キー・ネットワーク・モデルを確認してください。');}finally{p.busy=false;p.controller=null;}
     }));
   }
 }
