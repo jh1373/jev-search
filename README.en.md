@@ -48,6 +48,14 @@ Read the interpretation, the limits, and what was not measured in the linked doc
 [acceptance test status](docs/acceptance-status.md). **Do not use this table alone as evidence of
 accuracy.**
 
+## Release
+
+**v0.1.0** (development preview): https://github.com/jh1373/jev-search/releases/tag/v0.1.0
+
+The assets are `main.js`, `manifest.json`, `styles.css` and `jev-search.zip`
+containing those three. **No Obsidian community plugin submission has been made.** To install, place the
+three files in `.obsidian/plugins/jev-search/` and enable the plugin.
+
 ## Key decisions
 
 - An Obsidian-native UI. No CLI, Python, or separate server is required from the user.

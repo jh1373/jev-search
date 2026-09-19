@@ -45,6 +45,14 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 数値の解釈・限界・未計測範囲は各リンク先と [受入テストの実施状況](docs/acceptance-status.md) にあります。
 **この表だけを「高精度」の根拠にしないでください。**
 
+## リリース
+
+**v0.1.0**（開発プレビュー）: https://github.com/jh1373/jev-search/releases/tag/v0.1.0
+
+`main.js` / `manifest.json` / `styles.css` の3ファイルと、それらをまとめた
+`jev-search.zip` を添付しています。**Obsidianコミュニティプラグインへの申請は行っていません。**
+インストールは自己責任で、`.obsidian/plugins/jev-search/` に3ファイルを置いて有効化します。
+
 ## 主要な決定
 
 - CLI、Python、独立サーバーをユーザーに要求しないObsidianネイティブUI。
