@@ -42,6 +42,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### The two live-key tests, measured against the real API
+
+- AT-07 and AT-13 now pass, so **all twenty acceptance tests are measured passes**. The only thing not
+  exercised is AT-07's direct route, which is unreachable while TypeSafe's waitlist stands.
+- **AT-07** compares the three conditions against the live API: Jev off with a key present sends
+  nothing, Jev on with no key sends nothing, and Jev on with a key sends exactly one request after the
+  consent dialog is approved - which then reorders the results. The smoke test separately confirms HTTP
+  200, a 721ms round trip, the model resolving to `typesafe/jev-1.13-20260917`, strict validation
+  passing, and a real cost of $0.000028 for synthetic data.
+- **AT-13**: on 806 Japanese Wikipedia articles with 120 corpus-derived katakana queries, nDCG@10 rises
+  from 0.5258 to **0.8788** - 75 queries improved, 1 worsened, 44 unchanged, no live failures. The
+  40-query subset shows the same direction (0.4534 to 0.8131). Relevance comes from the corpus, never
+  from Jev, so Jev is not graded against its own opinion. It is a point estimate, and the one worsened
+  query is reported rather than averaged away.
+- A correction worth keeping: **CDP cannot see these requests.** The plugin sends through Node's
+  `https` module, which does not go through Chromium's network stack, so a CDP-only "zero sends"
+  claim would miss real traffic. The three-condition test counts `require("node:https").request`
+  instead, and the CDP count is recorded beside it as a cross-check.
+- Also corrected: the running Obsidian had updated itself to **1.13.7** during this work. Earlier
+  measurements in this repository were taken on 1.13.4 and are labelled as such; these live tests ran on
+  1.13.7.
+
 ### Release packaging inspected
 
 - AT-14 now passes: 18 measured passes, with AT-07 and AT-13 the only partials left, both waiting on a
