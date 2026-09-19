@@ -2,12 +2,13 @@
 // AT-20: an unknown or hostile settings schema must not crash the plugin, must fall back to safe
 // defaults in memory, and must not destroy the stored file.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const vault = '.sandbox/at20-vault', profile = '.sandbox/at20-profile', port = 9290;
 
 // A schema from a hypothetical future version, plus values that a naive reader would trust.

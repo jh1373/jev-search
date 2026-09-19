@@ -5,13 +5,14 @@
 // AT-10 needs the app to be closed gracefully: a forced kill cannot be distinguished from a
 // mutation the plugin made, so the vault is hashed before launch and after a clean exit.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm, readFile, readdir, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join, relative } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const arg = (name, fallback) => {
   const hit = process.argv.find(a => a.startsWith('--' + name + '='));
   return hit ? hit.slice(name.length + 3) : fallback;

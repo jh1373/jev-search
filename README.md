@@ -24,9 +24,11 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 10. [日本語評価プロトコル](docs/benchmark/protocol.md)
 11. [レビュー記録・改善バックログ（2026-09-18）](docs/reviews/2026-09-18-product-tradeoffs.md)
 12. [受入テストの実施状況（何が実測で確かめられ、何が未確認か）](docs/acceptance-status.md)
+13. [プライバシー（何が端末外に出て、何が残るか）](docs/privacy.md)
 
-受入テスト20件のうち、実測で合格したのは AT-01 / AT-08 / AT-10 の3件です（送信0件・Vault無変更・秘密漏れ0件）。
-レビュー5項目のうち RV-04（キー再入力）は解決し、RV-02（候補漏れ）は合成コーパスで数値を得ました。残りは未検証です。
+受入テスト20件のうち、実測で合格したのは **11件**（AT-01 / AT-03 / AT-04 / AT-06 / AT-08 / AT-10 / AT-12 / AT-15 / AT-17 / AT-18 / AT-20）、
+一部合格が8件、未実施が AT-13 の1件です。
+レビュー5項目のうち RV-04（キー再入力）は解決し、RV-02（候補漏れ）は合成コーパスと公開コーパスで数値を得ました。
 詳細と残作業は [受入テストの実施状況](docs/acceptance-status.md) にあります。
 
 ## 主要な決定
@@ -48,8 +50,8 @@ TypeSafe/Obsidianの公式製品とは表示しません。
 
 | 項目 | 確認内容 |
 |---|---|
-| 作業場所 | `C:\Users\systemuser\Desktop\Jev×Obsidian` |
-| Obsidian実行ファイル | `C:\Users\systemuser\AppData\Local\Programs\Obsidian\Obsidian.exe` の存在を確認 |
+| 作業場所 | ローカルにクローンした作業ツリー（絶対パスはリポジトリに記録しない） |
+| Obsidian実行ファイル | 既定のインストール先を自動検出。`OBSIDIAN_EXE` で上書きできる |
 | Node / npm / Git | 24.18.0 / 11.15.0 / 2.52.0.windows.1 |
 | npm公開版の照会 | obsidian 1.13.1 / typescript 7.0.2 / esbuild 0.28.2 / vitest 5.0.1 |
 | APIキー | TypeSafe直接キーは未取得（待機リスト中）。**OpenRouter のキーは発行済み**。開発は OpenRouter 経由で進める（ADR-012） |
@@ -70,9 +72,11 @@ G0: 合成ノートだけを使う接続スパイク → G1: ローカル検索 
 ## テスト
 
 ```
-npm run check       # 型検査 → 単体19件 → ビルド
-npm run test:bundle # 生成バンドルの読込・ローカル検索
-npm run test:gui    # 実機Obsidian GUI E2E（専用Vault・起動〜終了・証跡）
+npm run check        # 型検査 → 単体35件 → ビルド
+npm run test:bundle  # 生成バンドルの読込・ローカル検索
+npm run test:release # 版一致・LICENSE/NOTICE・秘密/個人パスの混入検査
+npm run test:gui     # 実機Obsidian GUI E2E（専用Vault・起動〜終了・証跡）
+npm run test:mock    # 実APIキーなしでJev応答の扱いを検証（制御したトランスポート）
 ```
 
 `test:gui`は専用Vault以外では実行を拒否し、今回起動したプロセスだけを終了します。
@@ -82,6 +86,6 @@ npm run test:gui    # 実機Obsidian GUI E2E（専用Vault・起動〜終了・�
 
 ## 設計検査
 
-`C:\Users\systemuser\Desktop\Jev×Obsidian\scripts\verify-design.ps1` は
+`scripts/verify-design.ps1` は
 文書の存在、ローカルリンク、要件ID参照、文字化けを機械検査します。
 これはプラグイン動作・API・セキュリティ監査を代替しません。

@@ -2,12 +2,13 @@
 // AT-18: the judgement cache must be memory-only, and diagnostics must carry counts and versions
 // only. Also checks that the cache is emptied when the setting changes and when the plugin unloads.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const vault = '.sandbox/at18-vault', profile = '.sandbox/at18-profile', port = 9300;
 
 await rm(vault, { recursive: true, force: true });

@@ -2,12 +2,13 @@
 // AT-12: 100 consecutive changes, repeated reload/disable, and a check for leftover listeners,
 // timers and queue work. Runs against a real Obsidian and a disposable vault.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const arg = (name, fallback) => {
   const hit = process.argv.find(a => a.startsWith('--' + name + '='));
   return hit ? hit.slice(name.length + 3) : fallback;

@@ -31,3 +31,5 @@ jobs:
         run: npm run check
       - name: Verify the generated bundle
         run: npm run test:bundle
+      - name: Inspect what would be released
+        run: npm run test:release

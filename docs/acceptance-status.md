@@ -47,7 +47,7 @@ Jev連携の受入テスト（AT-03 / AT-04 / AT-06 / AT-15 / AT-17）は、`scr
 | AT-11 | 一部合格 | [実機負荷試験](benchmark/result-load-10k.md): 実Obsidian 1.13.4・合成10,000ノートで索引完了52.1s→16.4s、UI停止なし（フレーム間隔p95 17〜23ms、200ms超のフレームは各回2回）、ヒープ144〜251MB | 1ノート50MiB級の巨大ノートと、50MiB総量での試験 |
 | AT-12 | **合格** | `scripts/verify-at12.mjs`: 20ノートのVaultで100件連続作成→50件編集→25件削除→10件改名。各段階で索引数がディスクと一致（120→95→95）、削除ノートは検索で見つからず、編集ノートは再索引され古い語は消えた。無効化/有効化5回の後も95件で一致、`pending` 0、タイマー残存0 | なし |
 | AT-13 | 未実施 | — | 公開コーパスでの再実行（Phase C。Jev実APIが必要） |
-| AT-14 | 一部合格 | CI（`.github/workflows/ci.yml`）がclean checkoutで `npm ci` → typecheck → test → build → `verify-bundle.mjs` を実行。版は `manifest.json`/`package.json`/`versions.json` で一致 | NOTICE整備と、release成果物の実検査 |
+| AT-14 | **合格** | `scripts/verify-release.mjs`: 版が `manifest.json`/`package.json`/`versions.json` で一致、`LICENSE`/`NOTICE` が存在、追跡61ファイルに鍵・メール・個人絶対パスなし。CIがclean checkoutで `npm ci --ignore-scripts` → `npm run check` → `test:bundle` → `test:release` を実行。`release.yml` がタグ時にzipを検査して公開 | 実際のタグ付けと公開操作 |
 | AT-15 | **合格** | `scripts/verify-at-mock.mjs`: 応答しないモックで **4,497ms** で打ち切り `Local fallback: cancelled`、短い `Retry-After` で**2リクエスト**（1回再試行）、長い `Retry-After` で**1リクエスト**で `rate-limit`、取消を10回連打しても**物理リクエストは1**。`test/jev.test.ts` が事前取消も検証 | 実APIでの4秒超応答 |
 | AT-16 | 一部合格 | `prepare()` が24KiB上限まで文書を削り、最大20文書に制限。previewに概算コストを表示 | 3バッチ必要時の未送信表示と予算停止の実機確認 |
 | AT-17 | **合格** | `scripts/verify-at-mock.mjs`: preview表示中に候補ノートを削除→「送信」後も**新規リクエスト0件**。承認が無効化され、古いデータは送信されない | 本文変更・除外設定変更中の実機試験 |

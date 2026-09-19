@@ -19,6 +19,8 @@
     "test:at18": "node scripts/verify-at18.mjs",
     "test:at20": "node scripts/verify-at20.mjs",
     "test:load": "node scripts/load-test.mjs",
+    "test:release": "node scripts/verify-release.mjs",
+    "bench:public": "node scripts/fetch-public-corpus.mjs",
     "test:bundle": "node scripts/verify-bundle.mjs",
     "bench:corpus": "node scripts/gen-corpus.mjs",
     "bench:recall": "node scripts/measure-recall.mjs",

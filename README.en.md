@@ -58,8 +58,8 @@ implementation gate, and measurements and decisions are appended.
 
 | Item | Finding |
 |---|---|
-| Working directory | `C:\Users\systemuser\Desktop\Jev×Obsidian` |
-| Obsidian executable | Existence of `C:\Users\systemuser\AppData\Local\Programs\Obsidian\Obsidian.exe` confirmed |
+| Working directory | A locally cloned working tree (absolute paths are not recorded in the repository) |
+| Obsidian executable | Detected from the usual install locations; override with `OBSIDIAN_EXE` |
 | Node / npm / Git | 24.18.0 / 11.15.0 / 2.52.0.windows.1 |
 | npm registry query | obsidian 1.13.1 / typescript 7.0.2 / esbuild 0.28.2 / vitest 5.0.1 |
 | API key | No direct TypeSafe key yet (on the waiting list). An **OpenRouter key has been issued**. Development proceeds through OpenRouter (ADR-012) |
@@ -94,6 +94,6 @@ No personal vault and no live API are used. See the
 
 ## Design checks
 
-`C:\Users\systemuser\Desktop\Jev×Obsidian\scripts\verify-design.ps1` mechanically checks
+`scripts/verify-design.ps1` mechanically checks
 document existence, local links, requirement ID references, and mojibake.
 It does not replace plugin behaviour, API, or security auditing.

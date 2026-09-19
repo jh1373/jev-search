@@ -1,6 +1,7 @@
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-const OBSIDIAN='C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const port=process.argv[2]||'9222';
 const profile=process.argv[3];
 const args=['--remote-debugging-port='+port,'--remote-debugging-address=127.0.0.1'];

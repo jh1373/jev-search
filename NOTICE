@@ -1,0 +1,32 @@
+Jev Search
+Copyright (c) 2026 jh
+
+This product is licensed under the MIT License. See LICENSE.
+
+Bundled third-party code
+------------------------
+
+None. The released main.js is produced by esbuild from the files in src/ and imports only Obsidian's
+own API and Node.js built-in modules (node:https, node:crypto, node:events). Obsidian's API is provided
+by the host application at runtime and is not redistributed here.
+
+Build-time dependencies (not redistributed in the release)
+----------------------------------------------------------
+
+  esbuild       MIT License
+  TypeScript    Apache License 2.0
+  obsidian      MIT License (type declarations only, used to typecheck against the host API)
+  @types/node   MIT License
+
+Jev and TypeSafe
+----------------
+
+"Jev" and the TypeSafe System One API are services operated by TypeSafe. This plugin is an independent
+client. It is not affiliated with, sponsored by, or endorsed by TypeSafe. Use of the Jev API is subject
+to TypeSafe's own terms, and any cost the API reports is billed by them, not by this project.
+
+Obsidian
+--------
+
+"Obsidian" is a trademark of Dynalist Inc. This is an independent, unofficial plugin and is not
+affiliated with or endorsed by Obsidian.

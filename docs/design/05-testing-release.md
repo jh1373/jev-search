@@ -33,10 +33,10 @@
 
 ## 専用VaultとE2E
 
-予定パス: `C:\Users\systemuser\Desktop\Jev×Obsidian\.sandbox\vault`。
-個人Vault `C:\Users\systemuser\Documents\Obsidian Vault` は使用しない。
+予定パス: `.sandbox/vault`（リポジトリ相対）。
+利用者の個人Vaultは使用しない（テストは専用Vaultだけを開く）。
 試験データは架空チームの会議など機密を含まない自作Markdown。
-Obsidian実行ファイルは `C:\Users\systemuser\AppData\Local\Programs\Obsidian\Obsidian.exe`。
+Obsidian実行ファイルは既定のインストール先を自動検出し、`OBSIDIAN_EXE` で上書きできる。
 専用Vaultを明示して開く。既存Vault登録やプラグイン設定は上書きしない。
 
 E2E項目: 読込→コマンド表示→検索→同意→実API→結果→位置移動→無効化。

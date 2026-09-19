@@ -109,7 +109,7 @@ Obsidian 1.13.4は専用manual-vaultで起動。画面での検索操作は未�
 
 ## 試す場所
 
-専用Vault: `C:\Users\systemuser\Desktop\Jev×Obsidian\.sandbox\manual-vault`
+専用Vault: `.sandbox/manual-vault`（リポジトリ相対）
 合成ノートMeeting.mdに「定例会は毎週火曜日です」を配置。
 1. Obsidianのコマンドパレットで「Jev Search: Open search」。
 2. 「定例会」で検索しMeeting.mdの抜粋が表示されることを確認。

@@ -8,13 +8,14 @@
 // Obsidian 1.13.4 opens modals in a separate window, so the consent dialog is driven through its own
 // CDP target rather than the main one.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const vault = '.sandbox/at-mock-vault', profile = '.sandbox/at-mock-profile', port = 9313;
 
 await rm(vault, { recursive: true, force: true });

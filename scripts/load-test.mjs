@@ -9,12 +9,13 @@
 // user's vault does. Indexing starts from onLayoutReady, so the timer runs from layoutReady until
 // plugin.indexed flips to true.
 
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, cp, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { connectPage } from './cdp-client.mjs';
 
-const OBSIDIAN = 'C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const arg = (name, fallback) => {
   const hit = process.argv.find(a => a.startsWith('--' + name + '='));
   return hit ? hit.slice(name.length + 3) : fallback;

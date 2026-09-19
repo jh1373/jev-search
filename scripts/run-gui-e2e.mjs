@@ -1,5 +1,6 @@
 // One-command GUI acceptance test: builds, launches a dedicated vault, drives Obsidian
 // through CDP, saves screenshots, then stops only the process it started.
+import { obsidianExe } from './obsidian-exe.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, rm, copyFile, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -12,7 +13,7 @@ const VAULT=`${BASE}/vault`;
 const PROFILE=`${BASE}/profile`;
 const EVIDENCE=`${BASE}/evidence`;
 const PORT=9222;
-const OBSIDIAN='C:/Users/systemuser/AppData/Local/Programs/Obsidian/Obsidian.exe';
+const OBSIDIAN = obsidianExe();
 const NOTES={'Meeting.md':'# 架空チームの会議\n定例会は毎週火曜日です。\n','Cooking.md':'# 料理\n夕食はカレーです。\n'};
 
 function run(command,args){execFileSync(command,args,{stdio:'inherit',shell:false,env:{...process.env,...(process.platform==='win32'?{PATH:process.env.PATH}:{})}});}

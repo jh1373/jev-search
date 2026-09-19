@@ -42,6 +42,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests: 24 to 29, covering OpenRouter payload pinning, the resolved snapshot version, actual cost
   reporting, and rejection of a wrong model, provider warnings, and a missing distribution.
 
+### Release readiness
+
+- Added `NOTICE` and `docs/privacy.md`. The privacy statement says what leaves the machine (only
+  the top-20 candidate excerpts, and only after you approve the preview), what stays local, and what is
+  not implemented (no telemetry). It states plainly that Obsidian's SecretStorage is profile-scoped
+  rather than vault-scoped, and does not claim it is encrypted or that it never syncs.
+- Added `scripts/verify-release.mjs` (AT-14): version agreement across manifest.json, package.json
+  and versions.json, the licence files the manifest promises, and a scan of every tracked file for a
+  key, an email address, a private key or a developer absolute path.
+- That scan immediately found eight GUI scripts and four documents carrying this machine's home
+  directory. The scripts now resolve Obsidian through `scripts/obsidian-exe.mjs` (honouring
+  `OBSIDIAN_EXE`, otherwise the usual install locations), and the documents describe the location
+  instead of naming it. Nothing personal is left in the tree.
+- Added `.github/workflows/release.yml`: on a `v*` tag it rebuilds, checks the tag names the
+  manifest version, packages the three files Obsidian loads, inspects the archive contents, and
+  publishes. CI now also runs the release inspection on every push.
+- Recorded Obsidian's own version as 1.13.4 and the real API contract as still unverified: a controlled
+  transport proves the plugin's handling, not the live service.
+
 ### Jev integration verified without a key
 
 - AT-03, AT-04, AT-06, AT-15 and AT-17 now pass. The built bundle calls
