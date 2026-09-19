@@ -17,6 +17,8 @@ const module={exports:{}};
 runInNewContext(readFileSync('dist/main.js','utf8'),{module,exports:module.exports,require:(name)=>{
   if(name==='obsidian')return {Plugin,ItemView:class{},Modal:class{},PluginSettingTab:class{},Setting:class{},SecretComponent:class{},TFile:class{},Notice:class{}};
   if(name==='node:https')return nativeRequire(name);
+  // Node builtins available in Obsidian's desktop runtime. Anything else is an unexpected dependency.
+  if(name==='node:crypto')return nativeRequire(name);
   throw Error('Unexpected runtime dependency');
 },TextEncoder,Buffer,AbortController,setTimeout,clearTimeout,structuredClone});
 const instance=new module.exports.default();
@@ -26,6 +28,8 @@ assert.equal(instance.views[0],'jev-search-view');
 assert.equal(instance.key,'');
 assert.equal(instance.settings.enabled,false);
 assert.equal(instance.settings.endpoint,'openrouter','OpenRouter must be the default destination');
+assert.equal(instance.settings.cacheTtlMinutes,30,'The judgement cache is on by default');
+assert.equal(instance.cache.enabled,true);
 // The mocked plugin runs in a separate vm context, so compare values rather than deepStrictEqual.
 assert.equal(instance.keys.openrouter,'');assert.equal(instance.keys.gateway,'');assert.equal(instance.keys.direct,'');
 assert.ok(typeof instance.keys==='object'&&instance.keys!==null,'Session keys must never be persisted');
