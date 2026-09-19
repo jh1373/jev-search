@@ -37,6 +37,6 @@ jobs:
         run: node scripts/verify-release.mjs --tag="$GITHUB_REF_NAME" --zip=jev-search.zip
       - name: Publish
         env:
-          GH_TOKEN: $${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" --title "Jev Search $GITHUB_REF_NAME" --notes-file CHANGELOG.md jev-search.zip release/main.js release/manifest.json release/styles.css
