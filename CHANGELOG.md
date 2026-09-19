@@ -5,7 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-09-19
+
+Development preview. All twenty acceptance tests are measured; see
+[docs/acceptance-status.md](docs/acceptance-status.md) for what was measured, how, and what remains
+unverified. AT-07's direct route is the one thing that could not be exercised, because TypeSafe's
+waiting list has not opened.
 
 ### Added
 
@@ -263,7 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Still unconfirmed: the full response shape, the exact resolved `model` string, whether `legend` is
   present, and the numeric latency. `npm run test:live` captures these.
 
-## [0.1.0] - 2026-09-18
+### Initial preview (2026-09-18)
 
 Initial development preview. This is not a stable release for general distribution, and the
 verification status is recorded in [docs/implementation-preview.md](docs/implementation-preview.md).
