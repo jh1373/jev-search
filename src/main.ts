@@ -1,6 +1,6 @@
 import { Plugin, ItemView, WorkspaceLeaf, Modal, Setting, PluginSettingTab, SecretComponent, TFile, getAllTags, Notice, requestUrl } from 'obsidian';
 import { SearchIndex, isExcluded, type SearchHit } from './core/search';
-import { prepare, evaluate, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target, type Transport } from './core/jev';
+import { prepare, evaluate, utf8ByteLength, MODEL, OPENROUTER_MODEL, GATEWAY_MODEL, ENDPOINTS, PRICE_PER_MTOK, type Target, type Transport } from './core/jev';
 import { createRequestUrlTransport } from './adapters/transport';
 import { JudgementCache, judgementKey } from './core/cache';
 const VIEW='jev-search-view';
@@ -106,7 +106,7 @@ class Consent extends Modal {
     if(target==='gateway')this.contentEl.createEl('p',{text:'Vercel AI Gateway を経由して TypeSafe AI に転送されます。保持・学習の条件はGatewayと提供元の方針に従い、当プラグインは保証しません。'});
     if(target==='openrouter')this.contentEl.createEl('p',{text:'OpenRouter を経由して TypeSafe AI に転送されます。プロバイダを TypeSafe に固定し、ZDR（ゼロデータ保持）を要求しています。保持・学習の最終条件は OpenRouter と提供元の方針に従い、当プラグインは保証しません。'});
     this.contentEl.createEl('p',{text:'クエリ・タイトル・抜粋を送信します。短いノートは全文を含みます。以下が送信するJSON全体です。取消しても送信済みデータは回収できません。'});
-    this.contentEl.createEl('p',{text:`${Buffer.byteLength(this.body)} bytes · 概算 $${(Buffer.byteLength(this.body)*PRICE_PER_MTOK[target]/1e6).toFixed(6)}（課金上限ではありません）`});
+    this.contentEl.createEl('p',{text:`${utf8ByteLength(this.body)} bytes · 概算 $${(utf8ByteLength(this.body)*PRICE_PER_MTOK[target]/1e6).toFixed(6)}（課金上限ではありません）`});
     this.contentEl.createEl('pre',{text:this.body,cls:'jev-preview'});
     new Setting(this.contentEl)
       .setName('Obsidianを閉じるまで次回から確認しない / Skip preview until Obsidian closes')
@@ -159,7 +159,7 @@ class SearchView extends ItemView {
     p.busy=true;const controller=new AbortController();p.controller=controller;this.status.setText('Sending to Jev… / Jevへ送信中…');
     try {
       // The body is content-addressed, so an edited note or a changed exclusion cannot hit a stale entry.
-      const cacheKey=judgementKey(prepared.body,p.settings.endpoint,p.key);
+      const cacheKey=await judgementKey(prepared.body,p.settings.endpoint,p.key);
       const hit=p.cache.get(cacheKey);const fromCache=hit!==null;
       const r=hit??(await evaluate(prepared.body,prepared.count,p.key,controller.signal,p.settings.endpoint,p.transport));
       if(!fromCache)p.cache.set(cacheKey,r);

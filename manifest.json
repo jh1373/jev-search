@@ -5,5 +5,5 @@
   "minAppVersion": "1.13.0",
   "description": "Search your Obsidian vault locally and offline with no API key, then rerank the top results with Jev only after you approve exactly what gets sent. Experimental preview.",
   "author": "jh",
-  "isDesktopOnly": true
+  "isDesktopOnly": false
 }

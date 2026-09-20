@@ -4,12 +4,12 @@ import { JudgementCache, judgementKey } from '../src/core/cache.ts';
 
 const judgement = (score: number) => ({ scores: [score], inputTokens: 10, cost: 0.0001 });
 
-test('judgement keys separate the body, the route and the key', () => {
-  const a = judgementKey('{"q":1}', 'openrouter', 'key-a');
-  assert.notEqual(a, judgementKey('{"q":2}', 'openrouter', 'key-a'));
-  assert.notEqual(a, judgementKey('{"q":1}', 'direct', 'key-a'));
-  assert.notEqual(a, judgementKey('{"q":1}', 'openrouter', 'key-b'));
-  assert.equal(a, judgementKey('{"q":1}', 'openrouter', 'key-a'));
+test('judgement keys separate the body, the route and the key', async () => {
+  const a = await judgementKey('{"q":1}', 'openrouter', 'key-a');
+  assert.notEqual(a, await judgementKey('{"q":2}', 'openrouter', 'key-a'));
+  assert.notEqual(a, await judgementKey('{"q":1}', 'direct', 'key-a'));
+  assert.notEqual(a, await judgementKey('{"q":1}', 'openrouter', 'key-b'));
+  assert.equal(a, await judgementKey('{"q":1}', 'openrouter', 'key-a'));
   // The key material is hashed, so the API key never appears in the map key.
   assert.ok(!a.includes('key-a'));
 });

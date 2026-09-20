@@ -5,7 +5,7 @@ const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.me
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 if (manifest.version !== pkg.version) throw new Error('Version mismatch');
 await mkdir('dist', { recursive: true });
-await build({ entryPoints: ['src/main.ts'], bundle: true, external: ['obsidian'], platform: 'node', target: 'es2022', format: 'cjs', outfile: 'dist/main.js', logLevel: 'info' });
+await build({ entryPoints: ['src/main.ts'], bundle: true, external: ['obsidian'], platform: 'browser', target: 'es2022', format: 'cjs', outfile: 'dist/main.js', logLevel: 'info' });
 for (const file of ['manifest.json','styles.css']) await copyFile(file, `dist/${file}`);
 const checksums = [];
 for (const file of ['main.js','manifest.json','styles.css']) checksums.push(`${createHash('sha256').update(await readFile(`dist/${file}`)).digest('hex')}  ${file}`);

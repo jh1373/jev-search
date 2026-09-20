@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto';
 import type { Judgement } from './jev.ts';
+
+const encoder = new TextEncoder();
 
 /**
  * Cache key for one judgement.
@@ -7,9 +8,13 @@ import type { Judgement } from './jev.ts';
  * The request body already contains the query and the clipped text of every candidate, so an edited
  * note, a changed exclusion, a different candidate set or a different route all produce a different
  * key on their own. The key material is hashed so the API key is never held in the map.
+ * Fully compatible with Web Crypto API across Desktop and Mobile (iOS / Android).
  */
-export function judgementKey(body: string, target: string, key: string): string {
-  return createHash('sha256').update(target).update('\u0000').update(key).update('\u0000').update(body).digest('hex');
+export async function judgementKey(body: string, target: string, key: string): Promise<string> {
+  const data = encoder.encode(`${target}\u0000${key}\u0000${body}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**

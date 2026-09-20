@@ -28,11 +28,11 @@ const requestUrl = async (params) => {
 };
 runInNewContext(readFileSync('dist/main.js','utf8'),{module,exports:module.exports,require:(name)=>{
   if(name==='obsidian')return {Plugin,ItemView:class{},Modal:class{},PluginSettingTab:class{},Setting:class{},SecretComponent:class{},TFile:class{},Notice:class{},requestUrl};
-  // node:https is intentionally forbidden. Obsidian requires requestUrl for mobile and guideline compliance.
+  // node:https and node:crypto are strictly forbidden. Obsidian requires requestUrl and Web Crypto API for mobile compliance.
   if(name==='node:https'||name==='https')throw Error('node:https is strictly forbidden; requestUrl must be used');
-  if(name==='node:crypto')return nativeRequire(name);
+  if(name==='node:crypto'||name==='crypto')throw Error('node:crypto is strictly forbidden; Web Crypto API (crypto.subtle) must be used');
   throw Error('Unexpected runtime dependency: '+name);
-},TextEncoder,Buffer,AbortController,setTimeout,clearTimeout,structuredClone});
+},TextEncoder,crypto,AbortController,setTimeout,clearTimeout,structuredClone});
 const instance=new module.exports.default();
 await instance.onload();
 assert.equal(instance.commands[0].id,'open-search');

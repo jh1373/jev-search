@@ -24,7 +24,7 @@ check(manifest.version === pkg.version, 'manifest.json version ' + manifest.vers
 check(versions[manifest.version] === manifest.minAppVersion,
   'versions.json[' + manifest.version + '] is ' + versions[manifest.version] + ', expected ' + manifest.minAppVersion);
 check(pkg.author === manifest.author, 'package.json author and manifest.json author differ');
-check(manifest.isDesktopOnly === true, 'manifest.json must declare isDesktopOnly');
+check(manifest.isDesktopOnly === false || manifest.isDesktopOnly === undefined, 'manifest.json must allow mobile or declare isDesktopOnly: false');
 check(typeof manifest.id === 'string' && /^[a-z][a-z0-9-]*$/.test(manifest.id), 'manifest.json id must be lowercase-with-dashes');
 notes.push('version ' + manifest.version + ', minAppVersion ' + manifest.minAppVersion + ', id ' + manifest.id);
 
