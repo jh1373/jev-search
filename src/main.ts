@@ -130,10 +130,10 @@ class SearchView extends ItemView {
     this.registerDomEvent(this.input,'input',()=>{this.invalidate();if(this.timer)clearTimeout(this.timer);if(this.composing)return;this.timer=setTimeout(()=>this.search(),150);});
     this.registerDomEvent(this.input,'compositionstart',()=>{this.composing=true;if(this.timer)clearTimeout(this.timer);});
     this.registerDomEvent(this.input,'compositionend',()=>{this.composing=false;this.search();});
-    new Setting(root).addButton(b=>b.setButtonText('ローカル順').onClick(()=>this.search())).addButton(b=>b.setButtonText('Jevで並べ替え').onClick(()=>void this.rerank())).addButton(b=>b.setButtonText('取消').onClick(()=>{this.plugin.controller?.abort();this.invalidate();}));
+    new Setting(root).addButton(b=>b.setButtonText('Local order / ローカル順').onClick(()=>this.search())).addButton(b=>b.setButtonText('Rerank with Jev / Jevで並べ替え').onClick(()=>void this.rerank())).addButton(b=>b.setButtonText('Cancel / 取消').onClick(()=>{this.plugin.controller?.abort();this.invalidate();}));
     this.status=root.createDiv({attr:{'role':'status','aria-live':'polite'}});this.results=root.createDiv();this.search();
   }
-  invalidate(){this.epoch++;this.plugin.controller?.abort();if(this.status)this.status.setText('更新されました。再検索してください / Results invalidated.');}
+  invalidate(){this.epoch++;this.plugin.controller?.abort();if(this.status)this.status.setText('Results invalidated. Please search again. / 更新されました。再検索してください。');}
   search(){if(!this.input)return;this.local=this.plugin.index.search(this.input.value,50);this.render(this.local);
     this.status.setText(`${this.plugin.index.size} notes · ${this.local.length} chunks · ${this.plugin.indexed?'Ready':'Indexing'} · oversized skipped: ${this.plugin.skipped}`);}
   render(hits:SearchHit[],scores?:Map<string,number>){this.results.empty();const seen=new Set<string>();
@@ -144,7 +144,7 @@ class SearchView extends ItemView {
       if(scores)row.createEl('small',{text:scores.has(hit.id)?`Jev relevance: ${scores.get(hit.id)!.toFixed(2)} / 2 (not correctness probability)`:'未評価 / Not evaluated'});
     }
   }
-  async rerank(){const p=this.plugin;if(!p.settings.enabled||!p.key){new Notice('設定でJevを有効化し、セッション用APIキーを入力してください。');return;}if(p.busy){new Notice('通信中です / Request in progress');return;}
+  async rerank(){const p=this.plugin;if(!p.settings.enabled||!p.key){new Notice('Please enable Jev in settings and configure an API key. / 設定でJevを有効化し、APIキーを入力してください。');return;}if(p.busy){new Notice('Request in progress / 通信中です');return;}
     this.search();const query=this.input.value;const generation=p.generation,epoch=this.epoch;const hits=this.local.slice(0,20);
     if(!hits.length)return;const prepared=prepare(query,hits,p.settings.endpoint);
     const shouldConfirm=p.settings.confirmTransmission!==false&&!p.sessionSkipConsent;
@@ -155,8 +155,8 @@ class SearchView extends ItemView {
     }else{
       if(!p.loaded||epoch!==this.epoch||generation!==p.generation||p.busy)return;
     }
-    for(const hit of hits.slice(0,prepared.count)){const f=this.app.vault.getFileByPath(hit.path);if(!f||!p.allowed(f)){new Notice('対象が変更されました。再検索してください。');return;}}
-    p.busy=true;const controller=new AbortController();p.controller=controller;this.status.setText('Jevへ送信中 / Sending…');
+    for(const hit of hits.slice(0,prepared.count)){const f=this.app.vault.getFileByPath(hit.path);if(!f||!p.allowed(f)){new Notice('Content modified. Please search again. / 対象が変更されました。再検索してください。');return;}}
+    p.busy=true;const controller=new AbortController();p.controller=controller;this.status.setText('Sending to Jev… / Jevへ送信中…');
     try {
       // The body is content-addressed, so an edited note or a changed exclusion cannot hit a stale entry.
       const cacheKey=judgementKey(prepared.body,p.settings.endpoint,p.key);
@@ -167,7 +167,7 @@ class SearchView extends ItemView {
       const scores=new Map(hits.slice(0,prepared.count).map((h,i)=>[h.id,r.scores[i]]));
       const ranked=hits.slice(0,prepared.count).sort((a,b)=>scores.get(b.id)!-scores.get(a.id)!);
       const allLow=r.scores.every(s=>s<1);this.render(allLow?this.local:[...ranked,...this.local.slice(prepared.count)],scores);
-      this.status.setText(`${allLow?'関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · ${fromCache?'cache hit · no new charge':`input tokens: ${r.inputTokens??'unknown'} · ${costText(r,p.settings.endpoint)}`}`);
+      this.status.setText(`${allLow?'Low relevance, local order retained / 関連度が低いため元順を保持':'Jev ranked'} · ${prepared.count} chunks · ${fromCache?'cache hit · no new charge':`input tokens: ${r.inputTokens??'unknown'} · ${costText(r,p.settings.endpoint)}`}`);
     } catch(error){if(p.loaded&&generation===p.generation&&epoch===this.epoch){this.render(this.local);this.status.setText(`Local fallback: ${error instanceof Error?error.message:'failed'}`);}}
     finally{p.busy=false;if(p.controller===controller)p.controller=null;}
   }
@@ -178,22 +178,22 @@ class Preferences extends PluginSettingTab {
   plugin:JevSearch;
   constructor(app:JevSearch['app'],plugin:JevSearch){super(app,plugin);this.plugin=plugin;}
   display(){this.containerEl.empty();const p=this.plugin;
-    this.containerEl.createEl('p',{text:'Experimental preview. キーはこのVaultの SecretStorage（値は data.json に入りません）か、セッションのみの上書きで保持します。'});
-    new Setting(this.containerEl).setName('Jevを有効化 / Enable Jev').addToggle(t=>t.setValue(p.settings.enabled).onChange(async value=>{p.settings.enabled=value;await p.save();}));
-    new Setting(this.containerEl).setName('プレビューを表示 / Confirm before transmission').setDesc('外部送信前にモーダルで内容と概算費用を確認します。OFFにすると再起動後も確認を省略して直接送信します。 / Show preview modal with payload and estimated cost before sending. If disabled, requests send immediately without prompt.').addToggle(t=>t.setValue(p.settings.confirmTransmission).onChange(async value=>{p.settings.confirmTransmission=value;p.sessionSkipConsent=false;await p.persist();}));
-    new Setting(this.containerEl).setName('接続先 / Endpoint').setDesc('OpenRouter 経由（既定）、または TypeSafe API へ直接送信。Vercel AI Gateway も選択できます。任意URLは設定できません。').addDropdown(d=>d.addOption('openrouter','OpenRouter').addOption('direct','TypeSafe API (direct)').addOption('gateway','Vercel AI Gateway').setValue(p.settings.endpoint).onChange(async value=>{p.invalidate();p.settings.endpoint=asTarget(value);await p.save();}));
-    new Setting(this.containerEl).setName('保存するキー / Stored secret').setDesc(`${ENDPOINTS[p.settings.endpoint].host} 用。Obsidian の SecretStorage に保存され、data.json には名前だけが入ります。再起動しても残ります。`).addComponent(el=>new SecretComponent(this.app,el).setValue(p.secretName).onChange(async value=>{p.invalidate();p.secretName=asSecretId(value);await p.persist();}));
-    new Setting(this.containerEl).setName('セッションのみのキー / Session-only key').setDesc('メモリのみで再起動すると消えます。上の保存キーより優先されます。').addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setPlaceholder(p.keys[p.settings.endpoint]?'(set)':'(empty)').onChange(value=>{p.invalidate();p.key=value.trim();});});
-    new Setting(this.containerEl).setName('除外フォルダ / Excluded folders').setDesc('One vault-relative folder per line').addTextArea(t=>t.setValue(p.settings.folders.join('\n')).onChange(async value=>{const folders=value.split('\n').map(s=>s.trim()).filter(Boolean);if(folders.some(s=>s.includes('..')||s.startsWith('/')||s.includes(':'))){new Notice('Invalid folder path');return;}p.settings.folders=folders.slice(0,100);await p.save();}));
-    new Setting(this.containerEl).setName('除外タグ / Excluded tags').addTextArea(t=>t.setValue(p.settings.tags.join('\n')).onChange(async value=>{p.settings.tags=value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,100);await p.save();}));
-    new Setting(this.containerEl).setName('診断をコピー / Copy diagnostics').setDesc('版と計数のみ。ノートのパス・本文・クエリ・キーは含みません。').addButton(b=>b.setButtonText('Copy').onClick(async()=>{const text=JSON.stringify(p.diagnostics(),null,2);try{await navigator.clipboard.writeText(text);new Notice('診断をコピーしました / Diagnostics copied');}catch{new Notice('コピーできませんでした / Copy failed');}}));
-    new Setting(this.containerEl).setName('キャッシュ保持 / Cache TTL').setDesc('同じ問い合わせの再送信を避けます（分、0で無効、既定30）。メモリのみで、ディスクには書きません。').addText(t=>{t.inputEl.type='number';t.inputEl.min='0';t.inputEl.max='60';t.setValue(String(p.settings.cacheTtlMinutes)).onChange(async value=>{const n=Number(value);if(!Number.isInteger(n)||n<0||n>60)return;p.settings.cacheTtlMinutes=n;await p.save();});});
-    new Setting(this.containerEl).setName('索引を再構築 / Rebuild index').addButton(b=>b.setButtonText('Rebuild').onClick(()=>void p.rebuild()));
-    new Setting(this.containerEl).setName('合成データで接続確認 / Test connection').addButton(b=>b.setButtonText('Preview test').onClick(async()=>{
-      if(!p.key||p.busy){new Notice('Key required / request already running');return;}
-      const prepared=prepare('定例会の曜日は？',[{title:'架空チーム',heading:'会議',text:'定例会は毎週火曜日です。'}],p.settings.endpoint);const generation=p.generation;
+    this.containerEl.createEl('p',{text:'Experimental preview. API keys are safely isolated in Obsidian SecretStorage (never written to data.json) or temporary session memory. / キーはこのVaultの SecretStorage（data.jsonには入りません）またはセッションメモリで安全に保持します。'});
+    new Setting(this.containerEl).setName('Enable Jev / Jevを有効化').addToggle(t=>t.setValue(p.settings.enabled).onChange(async value=>{p.settings.enabled=value;await p.save();}));
+    new Setting(this.containerEl).setName('Confirm before transmission / プレビューを表示').setDesc('Show preview modal with payload and estimated cost before sending. If disabled, requests send immediately without prompt. / 外部送信前にモーダルで内容と概算費用を確認します。').addToggle(t=>t.setValue(p.settings.confirmTransmission).onChange(async value=>{p.settings.confirmTransmission=value;p.sessionSkipConsent=false;await p.persist();}));
+    new Setting(this.containerEl).setName('Endpoint / 接続先').setDesc('Select API provider: OpenRouter (recommended) or TypeSafe API direct. Arbitrary URLs are not supported. / 送信先プロバイダを選択（OpenRouter推奨、またはTypeSafe直接）。').addDropdown(d=>d.addOption('openrouter','OpenRouter').addOption('direct','TypeSafe API (direct)').addOption('gateway','Vercel AI Gateway').setValue(p.settings.endpoint).onChange(async value=>{p.invalidate();p.settings.endpoint=asTarget(value);await p.save();}));
+    new Setting(this.containerEl).setName('Stored secret / 保存するキー').setDesc(`Secret name stored in Obsidian SecretStorage for ${ENDPOINTS[p.settings.endpoint].host}. Survives restarts; value never touches disk. / ${ENDPOINTS[p.settings.endpoint].host} 用の安全な保存キー名。再起動しても残ります。`).addComponent(el=>new SecretComponent(this.app,el).setValue(p.secretName).onChange(async value=>{p.invalidate();p.secretName=asSecretId(value);await p.persist();}));
+    new Setting(this.containerEl).setName('Session-only key / セッションのみのキー').setDesc('In-memory only; cleared when Obsidian exits. Overrides the stored secret above. / メモリ保持のみ。再起動で破棄されます。').addText(t=>{t.inputEl.type='password';t.inputEl.autocomplete='off';t.setPlaceholder(p.keys[p.settings.endpoint]?'(set)':'(empty)').onChange(value=>{p.invalidate();p.key=value.trim();});});
+    new Setting(this.containerEl).setName('Excluded folders / 除外フォルダ').setDesc('One vault-relative folder per line (e.g. Templates, Confidential). / 1行に1フォルダ（例: Templates, Confidential）。').addTextArea(t=>t.setValue(p.settings.folders.join('\n')).onChange(async value=>{const folders=value.split('\n').map(s=>s.trim()).filter(Boolean);if(folders.some(s=>s.includes('..')||s.startsWith('/')||s.includes(':'))){new Notice('Invalid folder path');return;}p.settings.folders=folders.slice(0,100);await p.save();}));
+    new Setting(this.containerEl).setName('Excluded tags / 除外タグ').setDesc('One tag per line without hash (e.g. private, secret). / 1行に1タグ（#なし、例: private, secret）。').addTextArea(t=>t.setValue(p.settings.tags.join('\n')).onChange(async value=>{p.settings.tags=value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,100);await p.save();}));
+    new Setting(this.containerEl).setName('Copy diagnostics / 診断をコピー').setDesc('Versions and counts only. No note paths, contents, queries or keys are included. / バージョンと統計数のみ。ノート本文やキーは含みません。').addButton(b=>b.setButtonText('Copy').onClick(async()=>{const text=JSON.stringify(p.diagnostics(),null,2);try{await navigator.clipboard.writeText(text);new Notice('Diagnostics copied / 診断をコピーしました');}catch{new Notice('Copy failed / コピー失敗');}}));
+    new Setting(this.containerEl).setName('Cache TTL / キャッシュ保持').setDesc('Avoid redundant requests for identical queries (minutes, 0 to disable, default 30). In-memory only. / 同一クエリの再送信防止（分、0で無効、既定30）。').addText(t=>{t.inputEl.type='number';t.inputEl.min='0';t.inputEl.max='60';t.setValue(String(p.settings.cacheTtlMinutes)).onChange(async value=>{const n=Number(value);if(!Number.isInteger(n)||n<0||n>60)return;p.settings.cacheTtlMinutes=n;await p.save();});});
+    new Setting(this.containerEl).setName('Rebuild index / 索引を再構築').setDesc('Rebuild the local search index from scratch. / ローカル検索インデックスを再構築します。').addButton(b=>b.setButtonText('Rebuild').onClick(()=>void p.rebuild()));
+    new Setting(this.containerEl).setName('Test connection / 合成データで接続確認').setDesc('Send a single synthetic request to verify API connectivity. / 1件の合成リクエストを送信してAPI疎通を確認します。').addButton(b=>b.setButtonText('Preview test').onClick(async()=>{
+      if(!p.key||p.busy){new Notice('API key required / request in progress');return;}
+      const prepared=prepare('What day is the regular meeting?',[{title:'Sample Team',heading:'Meeting',text:'The regular meeting is every Tuesday.'}],p.settings.endpoint);const generation=p.generation;
       if(!await new Promise<boolean>(resolve=>new Consent(p,prepared.body,approved=>resolve(approved)).open())||p.busy||!p.loaded||p.generation!==generation)return;
-      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint,p.transport);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · ${costText(r,p.settings.endpoint)}`);}catch{if(p.loaded)new Notice('接続確認失敗。キー・ネットワーク・モデルを確認してください。');}finally{p.busy=false;p.controller=null;}
+      p.busy=true;p.controller=new AbortController();try{const r=await evaluate(prepared.body,1,p.key,p.controller.signal,p.settings.endpoint,p.transport);if(p.loaded)new Notice(`API OK (${ENDPOINTS[p.settings.endpoint].host}): score ${r.scores[0]} / 2 · ${costText(r,p.settings.endpoint)}`);}catch{if(p.loaded)new Notice('Connection test failed. Please check your API key and network.');}finally{p.busy=false;p.controller=null;}
     }));
   }
 }

@@ -1,240 +1,234 @@
 # Jev Search for Obsidian
 
+[English](README.md) | [日本語](README.ja.md)
+
 [![Release](https://img.shields.io/badge/release-v0.1.0-blue.svg)](https://github.com/jh1373/jev-search/releases/tag/v0.1.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.13.1%2B-purple.svg)](https://obsidian.md)
 [![Powered by Jev](https://img.shields.io/badge/AI-TypeSafe%20Jev-orange.svg)](https://typesafe.ai)
 
-**大量のノートから、文脈を理解して探したい知識を一瞬で浮上させる、Obsidian向け次世代AIハイブリッド検索プラグイン。**
+**Next-generation hybrid AI search for Obsidian that surfaces the exact knowledge you need from thousands of notes in milliseconds.**
 
-ローカル完結の超高速検索エンジン（BM25）と、TypeSafeの超高速判断AI「Jev」を融合。10,000ノートの環境でも15ミリ秒で候補を絞り込み、AIが「質問の意図に本当に答えているメモ」を1位に並び替えます。
-
----
-
-## なぜ Jev Search なのか？（従来の検索との違い）
-
-### 従来のObsidian検索が抱える課題
-Obsidianにメモが数百、数千と蓄積されるにつれ、標準検索や従来のプラグインでは目的のメモに辿り着きにくくなります。
-- **キーワード完全一致の限界**: 「API設計の注意点」を探したいのに、ノートに「エンドポイント作成の考慮事項」と書いてあるとヒットしない。
-- **大量ノートでの埋没**: 検索単語が1回登場しただけの無関係なノートが大量に引っかかり、本当に欲しかった重要なメモが20位〜30位に沈んでしまう。
-- **既存AIツールの問題**: 一般的なLLM検索は「文章の要約や回答生成」をしようとするため、回答待ちに数秒かかり、さらに勝手に嘘を混ぜる（ハルシネーション）リスクや高額な従量課金が発生します。
-
-### Jev を採用する圧倒的なメリット
-Jev Search は、従来の生成AIとは根本的に異なる **TypeSafe の旗艦モデル「Jev」** を世界で初めてObsidian検索に組み込みました。
-
-1. **「文章生成」ではなく「判断と確率」に特化した System One モデル**
-   - Jevは長文を生成するAIではなく、与えられた情報が「質問に直接答えているか」を瞬時に判定して確率スコアを出力するAIです。
-   - 要約や推測文を挟まないため、**ハルシネーション（嘘の生成）が原理的に起きず、ノートの内容そのものが持つ信頼性を100%維持**します。
-2. **圧倒的なコスト効率（出力トークン無料）**
-   - 入力トークン費用は **$0.042 / 100万トークン（約6円）**、そして**出力トークンは完全無料**です。
-   - 実際のリクエスト実測でも、1回のリランキング費用はわずか **$0.000028（約0.004円）** であり、日常的に何度リランキングを実行しても課金を気にする必要がありません。
-3. **実証された高精度と超高速応答（nDCG: 0.52 → 0.88 / レスポンス: 747ms）**
-   - 120クエリの実測検証において、検索結果の並び順の品質を表す指標（nDCG@10: 1.0に近いほど理想的）が **0.5258 から 0.8788 へと劇的に向上**。
-   - 実APIの応答レイテンシも **約750ミリ秒** と極めて高速で、「探したいのに埋もれていたメモ」が一瞬で最上位へ浮上します。
-4. **完全なプライバシー保護**
-   - 送信データはモデルの再学習やファインチューニングに一切使われません。
+Combining an ultra-fast local BM25 search engine with TypeSafe's revolutionary "Jev" System One judgment model. Narrow down candidates across 10,000 notes in 15 milliseconds offline, then let calibrated AI judgment elevate the note that genuinely answers your question directly to #1.
 
 ---
 
-## アーキテクチャ: 二段階ハイブリッド検索
+## Why Jev Search? (The Problem vs. Solution)
 
-速度と精度の両立、そしてプライバシー保護のため、**二段階ハイブリッド検索アーキテクチャ**を採用しています。
+### The Limitations of Standard Obsidian Search
+As your Obsidian vault grows to hundreds or thousands of notes, locating specific thoughts becomes increasingly difficult:
+- **Exact-Keyword Brittleness**: Searching for "API design tips" fails completely if your note mentions "endpoint creation guidelines".
+- **Drowning in Notes**: Notes with a single accidental keyword match bury your most critical insights at rank #20 or #30.
+- **Flaws in Existing LLM Plugins**: Traditional generative LLM plugins attempt full-text answers or summaries. They introduce 5–15 second waiting times, fabricate information (hallucinations), and incur significant recurring subscription or token costs.
+
+### The Jev Advantage
+Jev Search integrates **TypeSafe's flagship "Jev" model**—the world's first System One model designed specifically for focused software judgments:
+
+1. **System One Judgment: Evaluative, Not Generative**
+   - Jev does not generate conversational prose. Instead, it evaluates whether a given note excerpt directly answers your query, outputting calibrated probability distributions and structured scores.
+   - With no generative fluff, **hallucinations are mathematically impossible**. The integrity and authenticity of your personal notes remain 100% intact.
+2. **Disruptive Cost Efficiency (Free Output Tokens)**
+   - Input token pricing is **$0.042 per million tokens (~$0.000042 / 1k tokens)**, and **output tokens are completely free**.
+   - In live measurements, a 3-document rerank request cost only **$0.000028 (~$0.03 per 1,000 searches)**. You can search and rerank all day without worrying about API bills.
+3. **Empirically Proven Retrieval Quality (nDCG: 0.52 → 0.88 / Latency: 747ms)**
+   - Across a benchmark of 120 live queries, ranking quality (nDCG@10: where 1.0 represents an ideal ranking) **jumped from 0.5258 to 0.8788 (+67% improvement)**.
+   - The cloud API round-trip takes only **~750 milliseconds**, keeping your creative flow uninterrupted.
+4. **Uncompromising Privacy**
+   - In accordance with TypeSafe and OpenRouter Zero Data Retention (ZDR) agreements, your notes are never stored or used to train or fine-tune models.
+
+---
+
+## Architecture: Two-Stage Hybrid Search
+
+To guarantee instant responsiveness, zero cloud lock-in, and airtight privacy, Jev Search employs a **Two-Stage Hybrid Search Architecture**:
 
 ```mermaid
 flowchart TD
-    Query["ユーザーの検索クエリ"] --> Step1
+    Query["User Search Query"] --> Step1
 
-    subgraph Step1["第1段階: ローカル検索（端末内・オフライン）"]
-        L1["Vault内の全Markdownノート (10,000+ 件)"]
-        L2["日本語加重ハイブリッド型トークナイザー<br/>(漢字熟語 + カタカナ語 + 2-gram)"]
-        L3["ローカル BM25 ランキングエンジン"]
+    subgraph Step1["Stage 1: Local Search (On-Device, Offline)"]
+        L1["Vault Markdown Notes (10,000+ files)"]
+        L2["Weighted Hybrid Tokenizer<br/>(Words + Unicode NFKC + Character N-grams)"]
+        L3["Local BM25 Scoring Engine"]
         L1 --> L2 --> L3
     end
 
-    Step1 -->|"超高速 15ms<br/>Top 20〜30件を抽出"| Filter{"プライバシー除外判定"}
+    Step1 -->|"Ultra-fast 15ms<br/>Extract Top 20 Candidates"| Filter{"Privacy Exclusions"}
 
-    subgraph Privacy["プライバシー制御"]
-        Filter -->|"除外フォルダ / #private タグ"| Blocked["送信から除外"]
-        Filter -->|"安全な候補のみ"| Preview["送信前プレビュー確認<br/>(送信内容を事前に目視可能)"]
+    subgraph Privacy["Privacy & Consent Control"]
+        Filter -->|"Excluded Folders / #private Tags"| Blocked["Dropped from Outbound Candidates"]
+        Filter -->|"Safe Candidates Only"| Preview["Pre-flight Consent Modal<br/>(Inspect exact JSON payload & cost)"]
     end
 
-    Preview -->|"ユーザーの明示的同意<br/>(完全オプトイン)"| Step2
+    Preview -->|"User Explicit Confirmation<br/>(Strict Opt-In)"| Step2
 
-    subgraph Step2["第2段階: Jev AI リランキング（クラウド）"]
+    subgraph Step2["Stage 2: Jev AI Reranking (Cloud API)"]
         J1["TypeSafe Jev (Jev-1.13)"]
-        J2["質問への適合度を確率スコア化<br/>(較正確率分布による判定)"]
+        J2["Calibrated Relevance Probabilities<br/>(0: Unrelated, 1: Relevant, 2: Direct Answer)"]
         J1 --> J2
     end
 
-    Step2 -->|"nDCG 0.88 の高精度"| Result["文脈に合致した最適な順位で表示"]
+    Step2 -->|"nDCG 0.88 Quality"| Result["Ranked by genuine semantic relevance"]
 ```
 
-- **用語解説**:
-  - **BM25**: 単語の出現頻度やノートの長さを考慮して関連度を計算する、検索エンジンの標準的な高性能スコアリング方式。
-  - **リランキング（再ランキング）**: 検索エンジンが拾った上位候補に対して、より賢いAIが文脈を深く読んで最適な順序に並び替える技術。
-  - **nDCG**: 検索エンジンの順位付けの正確さを測る業界標準指標。1.0に近いほど、人間にとって価値のある情報が上位にあることを示します。
+---
+
+## Key Features
+
+### ⚡ Ultra-Fast Local Search (BM25 Engine)
+- **10,000 Notes Searched in 15ms**: Background incremental indexing builds 10,000 notes in ~16 seconds without ever freezing the Obsidian UI.
+- **Weighted Hybrid Tokenizer**: Handles full English words, alphanumeric tokens, Kanji compound words, Katakana runs, and character 2-grams without requiring heavy multi-megabyte dictionary files. Retains a 100% Recall@50 for exact query expressions.
+
+### 🧠 Calibrated Jev AI Reranking
+- Top local candidates are evaluated against your question on a 3-tier calibrated scale (`Direct Answer`, `Relevant Topic`, `Unrelated`).
+- Reorders search results so the note with the highest information density and contextual relevance lands at rank #1.
+
+### 🔒 Privacy-First Design
+- **Strict Opt-In (Default OFF)**: Without explicitly entering an API key and requesting a rerank, zero network traffic is emitted. The local search engine operates 100% offline.
+- **Pre-flight Consent Modal**: Inspect the exact JSON payload, character count, and estimated cost before any data leaves your machine.
+- **Automatic Exclusion Filtering**: Sensitive folders (e.g. `Confidential/`) and private tags (e.g. `#private`, `#secret`) are excluded both before indexing and prior to network transmission.
+- **Secure Key Storage**: API keys are isolated in Obsidian SecretStorage or kept solely in temporary session memory. Keys are never written to `data.json` or saved in plain text.
+
+### 📱 Mobile & Desktop Ready (`requestUrl` Compliant)
+- Completely eliminates desktop-only Node.js networking libraries (`node:https`). Uses Obsidian's native `requestUrl` API, ensuring seamless compatibility across Desktop (Windows, macOS, Linux) and Mobile (iOS, Android).
 
 ---
 
-## 主な機能と特徴
+## Empirical Benchmarks
 
-### ⚡ 超高速ローカル検索（日本語加重ハイブリッド型トークナイザー）
-- **10,000ノートを15ミリ秒で検索**: インデックス構築も約16秒で完了し、バックグラウンド処理のためObsidianのエディタ操作を一切妨げません。
-- **日本語の検索漏れを防止**: 形態素解析辞書（数十MB）を持たずに軽量性を維持しながら、漢字熟語（2〜8文字）・カタカナ複合語・2-gram（2文字ずつの分割）を組み合わせた独自トークナイザーを搭載。表記揺れがあっても確実に候補を拾い上げます（完全一致表現のRecall@50は100%）。
+Jev Search is built upon verifiable, reproducible engineering data rather than subjective impressions.
 
-### 🧠 Jev AI による文脈再ランキング
-- ローカル検索で抽出された上位候補の抜粋をもとに、Jevが「ユーザーが本当に求めている情報か」を3段階（直接回答 / 関連話題 / 無関係）で精密評価。
-- 単なるキーワード一致ではなく、文脈や意図を汲み取ったランキングを実現します。
+### 1. 10,000 Note Vault Stress Test
+| Benchmark Metric | Measured Result | Significance |
+|---|---|---|
+| Initial Full Index Build | **16.4 seconds** | 10,000 notes indexed in the background without UI stutters |
+| Local Query Search Latency | **~15 ms** | Instant typing responsiveness |
+| Oversized Note (51 MiB) Handling | **0 ms (Skipped)** | Evaluated via `stat.size` to prevent memory exhaustion |
+| Unintended Outbound Network Calls | **0 calls** | Zero leakage when Jev is disabled or consent is withheld |
 
-### 🔒 徹底したプライバシーファースト設計
-- **完全オプトイン（初期設定はOFF）**: APIキーを設定し、明示的にリランキングを要求しない限り、外部通信は1バイトも発生しません。ローカル検索エンジン単体としても完全動作します。
-- **送信前プレビューモーダル**: 外部に送信される抜粋テキスト・ファイル名・トークン数を、送信ボタンを押す前に画面上で確認できます。
-- **自動除外フィルタ**: 設定した機密フォルダ（例: `Confidential/`）や、指定したタグ（例: `#private`）を含むノートは、インデックス作成時および送信直前の二重チェックで完全に除外されます。
-- **安全な認証情報管理**: APIキーは Obsidian SecretStorage またはセッションメモリのみで保持され、プラグインの設定ファイル（`data.json`）に平文で保存されることはありません。
+### 2. Retrieval Accuracy Before & After Jev
+| Evaluation Metric | Local BM25 Only | With Jev AI Reranking |
+|---|---|---|
+| **nDCG@10 (Ranking Quality)** | 0.5258 | **0.8788 (+67% Improvement)** |
+| **Exact Expression Recall@50** | 95.8% | **100.0% (Zero missed targets)** |
+| **Katakana / Loanword Recall@5** | 46.3% | **61.0% (Substantial boost)** |
 
-### 📱 モバイル環境への親和性（公式 `requestUrl` 準拠）
-- Node.js固有の通信ライブラリ（`node:https`等）を排除し、Obsidian公式の `requestUrl` APIで通信を統一。デスクトップだけでなく将来のモバイル（iOS / Android）環境でも安定して動作する設計基準を満たしています。
+> See [Public Corpus Evaluation](docs/benchmark/result-public-corpus.md) and [Live nDCG Results](docs/benchmark/result-ndcg-live.md) for full methodology and data.
+
+### 3. Live Jev API Verification (Latency, Cost & Calibration)
+Live end-to-end verification calling the real Jev model (`typesafe/jev-1.13`) via OpenRouter inside a running Obsidian instance:
+
+| Evaluation Metric | Measured Result | Significance |
+|---|---|---|
+| **API Response Latency** | **747 ms** | Sub-second turnaround compared to 5–15s for standard LLMs. |
+| **Actual Cost per Request** | **$0.000028 (~$0.004)** | Micro-cent pricing (Free output tokens). 100 reranks/day costs ~$0.08/month. |
+| **Calibrated Scores** | **Target: 2.0 / Topic: 0.07 / Noise: 0.0** | Probability 1.0 on direct answer; noise strictly scored at 0. |
+| **Security & Consent (AT-07)** | **0 leaked requests** | Verified via Chrome DevTools Protocol that unapproved requests never send. |
 
 ---
 
-## 実測ベンチマーク
+## Quick Start
 
-本プラグインは「感覚的な使いやすさ」だけでなく、実際の測定データに基づいて設計・最適化されています。
+### Installation
 
-### 1. 10,000ノート環境での負荷試験
-| 測定項目 | 実測値 | 備考 |
-|---|---|---|
-| インデックス初回構築時間 | **16.4 秒** | 10,000件のノートをUIフリーズなしで走査 |
-| 1クエリあたりの検索速度 | **約 15 ms** | キー入力に追従する即時応答 |
-| 超巨大ノート（51 MiB）の処理 | **0 ms（事前遮断）** | メモリ枯渇を防ぐため `stat.size` で安全にスキップ |
-| 外部への意図しない送信 | **0 件** | キーが存在しても有効化フラグがOFFなら完全遮断 |
+Jev Search is currently available as a development preview (v0.1.0).
 
-### 2. 検索精度のビフォー・アフター
-| 指標 | ローカルBM25のみ | Jev AI リランキング適用後 |
-|---|---|---|
-| **nDCG@10（検索順位の品質）** | 0.5258 | **0.8788（+67% 向上）** |
-| **完全一致表現の Recall@50** | 95.8% | **100.0%（取りこぼしゼロ）** |
-| **カタカナ語クエリの Recall@5** | 46.3% | **61.0%（大幅改善）** |
-
-> 詳しい測定手法やテストデータについては [公開コーパスでの測定結果](docs/benchmark/result-public-corpus.md) および [Jev投入後のnDCG測定結果](docs/benchmark/result-ndcg-live.md) をご覧ください。
-
-### 3. Jev 実API実動テスト（実測レスポンス・費用・較正確率）
-OpenRouter経由で実際の Jev モデル（`typesafe/jev-1.13`）を呼び出し、実機Obsidian環境から測定した実績データです。
-
-| 測定項目 | 実測値 | 意義とメリット |
-|---|---|---|
-| **API応答レイテンシ** | **747 ms** | 一般的な生成LLM（数秒〜十数秒）と一線を画す超高速応答。検索時の思考の流れを妨げません。 |
-| **1回あたりの実課金費用** | **$0.000028（約 0.004 円）** | 入力トークンのみの極小課金（出力トークン無料）。1日100回リランキングしても月額わずか約12円です。 |
-| **判定スコア（較正確率分布）** | **正解: 2.0 / 関連話題: 0.07 / 無関係: 0.0** | 「定例会の曜日」の問いに対し、正解ノートを確率100%で最高評価（スコア2）し、無関係なメモを厳密に0点判定。 |
-| **送信前プレビュー・安全性** | **実機外部送信 0件（意図しない送信を完全防止）** | 実機CDP監視テスト（AT-07）により、Jev無効時やプレビュー未承認時には一切の外部通信が発生しないことを実証済み。 |
-
----
-
-## クイックスタート
-
-### インストール方法
-
-現在は開発プレビュー版（v0.1.0）として提供されています。
-
-1. [Releases ページ](https://github.com/jh1373/jev-search/releases/tag/v0.1.0) から `jev-search.zip`（または `main.js`, `manifest.json`, `styles.css`）をダウンロードします。
-2. お使いの Obsidian Vault のプラグインフォルダに展開します：
+1. Download `jev-search.zip` (or `main.js`, `manifest.json`, `styles.css`) from the [Releases Page](https://github.com/jh1373/jev-search/releases/tag/v0.1.0).
+2. Extract the files into your Obsidian plugins folder:
    ```text
    <Your-Vault>/.obsidian/plugins/jev-search/
    ├── main.js
    ├── manifest.json
    └── styles.css
    ```
-3. Obsidianを開き、**設定 → コミュニティプラグイン** を開きます。
-4. 「インストール済みプラグイン」一覧にある **Jev Search** を「有効化」します。
+3. Open Obsidian, navigate to **Settings → Community plugins**.
+4. Enable **Jev Search** under "Installed plugins".
 
-### 初期設定
+### Initial Setup
 
-1. Obsidianの **設定 → Jev Search** を開きます。
-2. **API Provider**: 利用するプロバイダを選択します。
-   - **OpenRouter（推奨）**: 即座に利用可能で、モデルに `jev` を指定して従量利用できます。
-   - **TypeSafe Direct**: TypeSafe公式のAPIキーをお持ちの場合に利用します。
-3. **API Key**: APIキーを入力します（キーは安全なメモリ/SecretStorageに格納されます）。
-4. **Jev Reranking**: Jevによる再ランキング機能を利用する場合はスイッチをONにします（デフォルトは安全のためOFFになっています）。
-5. **除外設定（任意）**: 検索やAI送信の対象外にしたいフォルダパスやタグを設定します。
-
----
-
-## 使い方
-
-### 1. 検索モーダルの起動
-- ホットキー（デフォルト設定またはお好みのキーバインド）を押すか、コマンドパレット（`Ctrl+P` / `Cmd+P`）から **`Jev Search: Open Search`** を実行します。
-
-### 2. ローカル検索（即時インクリメンタル検索）
-- 検索窓にキーワードを入力すると、入力と同時に端末内のローカルBM25エンジンが作動し、15ミリ秒で候補一覧が表示されます。
-- これだけでも通常のObsidian検索より高速かつ高精度に目的のノートを探せます。
-
-### 3. Jev AI リランキングの実行
-- さらに文脈に沿った上位並び替えを行いたい場合、検索画面の **「Jev で並び替え」ボタン** をクリック（またはショートカット押下）します。
-- 送信前プレビューモーダルが開き、AIに送信されるノート抜粋と件数が表示されます。
-- 「送信して並び替える」を確定すると、Jevが各候補を吟味し、数秒で最も適切なノートを1位に並び替えます。
+1. Open **Settings → Jev Search**.
+2. **Endpoint**: Choose your provider:
+   - **OpenRouter (Recommended)**: Pay-as-you-go with instantaneous access to `typesafe/jev-1.13`.
+   - **TypeSafe Direct**: For direct TypeSafe API key holders.
+3. **Stored secret**: Enter your API key (stored safely in Obsidian SecretStorage).
+4. **Enable Jev**: Toggle ON to activate AI reranking (defaults to OFF for safety).
+5. **Exclusions (Optional)**: Configure folders or tags you want excluded from search and AI evaluations.
 
 ---
 
-## プライバシー & セキュリティ
+## Usage
 
-個人の思考や機密情報が蓄積されるObsidianだからこそ、プライバシー保護を最重要設計事項としています。
+### 1. Launch the Search View
+- Press your configured hotkey or open the Command Palette (`Ctrl+P` / `Cmd+P`) and run **`Jev Search: Open search`**.
 
-- **明示的な同意なき外部送信の禁止**: 自動でバックグラウンド送信されることは絶対にありません。
-- **抜粋のみの最小送信**: ノート丸ごとではなく、検索クエリに関連する前後の段落（スニペット）のみを送信します。
-- **暗号化通信**: すべての通信はHTTPSにより暗号化されます。
-- **AI学習への不使用**: TypeSafeのAPI規約により、送信されたリクエスト内容がモデルの学習データとして使われることはありません。
+### 2. Instant Local Search
+- Type any query in the search bar. The local BM25 engine updates results in ~15 milliseconds with title and text excerpts.
 
-詳細なプライバシーポリシーおよび端末内データの取り扱いについては [プライバシー設計書](docs/privacy.md) をご確認ください。
+### 3. Rerank with Jev AI
+- Click **"Rerank with Jev / Jevで並べ替え"** (or press Enter).
+- A pre-flight consent modal appears displaying the exact excerpt text, token count, and estimated cost.
+- Click **"Send / 送信"** to confirm. Jev evaluates candidates and elevates the most relevant note to #1 within seconds.
 
 ---
 
-## 開発・コントリビューション
+## Privacy & Security
 
-### 必要環境
+Your Obsidian vault contains your most private thoughts. Jev Search treats privacy as a foundational constraint:
+
+- **No Secret Network Traffic**: Data is transmitted only when you deliberately click "Send".
+- **Excerpt-Only Payloads**: Only bounded paragraphs relevant to your query are transmitted, never full vault archives.
+- **Zero Data Retention**: Requests enforce TypeSafe and OpenRouter ZDR policies; your notes are never used for model training.
+- **Secure Key Handling**: Keys are managed through Obsidian's native SecretStorage API or session-only RAM, never stored in plain text in `data.json`.
+
+For in-depth privacy specifications, see [Privacy Architecture Documentation](docs/privacy.md).
+
+---
+
+## Development & Contributing
+
+### Requirements
 - Node.js: `>= 22.18.0`
 - npm: `>= 10.0.0`
 
-### ビルドとテスト
-
-本プロジェクトでは、コードの堅牢性を担保するために多層的な自動テストと受入テストを実施しています。
+### Build and Test
 
 ```bash
-# 型チェック、単体テスト、ビルドの一括実行
+# Typecheck, unit tests, and build
 npm run check
 
-# 生成されたバンドルの整合性テスト
+# Verify bundle loading in an Obsidian sandbox
 npm run test:bundle
 
-# リリース整合性検査（秘密情報混入・バージョン整合・ライセンス確認）
+# Release verification (Secret leakage, version parity, license integrity)
 npm run test:release
 
-# モック環境でのJev通信シナリオ検証（APIキー不要）
+# Mocked transport scenario suite (No API key needed)
 npm run test:mock
 
-# 10,000ノート負荷試験
+# 10,000 note synthetic stress test
 npm run test:load
 
-# 実機Obsidian GUI E2Eテスト（専用サンドボックスVault使用）
+# Real Obsidian GUI E2E acceptance test (Driven via CDP)
 npm run test:gui
 ```
 
-### 技術仕様・設計ドキュメント一覧
-本リポジトリのすべての設計判断と技術検証の経緯は、`docs/` 配下にオープンに記録されています。
+### Technical Design Documentation
+All architecture decisions (ADRs), specifications, and empirical protocols are documented in `docs/`:
 
-- [なぜ Jev × Obsidian なのか（設計思想）](docs/design/00-why-jev-obsidian.md)
-- [製品要件・全体アーキテクチャ](docs/design/01-architecture.md)
-- [Jev通信仕様・キャッシュ設計](docs/design/02-jev-client.md)
-- [日本語検索エンジン・BM25・再ランキング設計](docs/design/03-search-rerank.md)
-- [UI設計・外部送信同意・シークレット管理](docs/design/04-ui-privacy.md)
-- [テスト方針・配布・運用設計](docs/design/05-testing-release.md)
-- [ロードマップ・設計判断記録（ADR）](docs/design/06-roadmap.md)
-- [要件と受入テスト対応表](docs/design/07-acceptance.md)
-- [受入テスト実施状況と実測サマリー](docs/acceptance-status.md)
-- [開発プレビュー記録](docs/implementation-preview.md)
+- [Why Jev × Obsidian (Vision & North Star)](docs/design/00-why-jev-obsidian.md)
+- [System Architecture & Requirements](docs/design/01-architecture.md)
+- [Jev Client & Network Specification](docs/design/02-jev-client.md)
+- [Search Index & Reranking Mechanics](docs/design/03-search-rerank.md)
+- [UI, Consent & Secret Management](docs/design/04-ui-privacy.md)
+- [Testing & Release Strategy](docs/design/05-testing-release.md)
+- [Roadmap & Architecture Decision Records (ADRs)](docs/design/06-roadmap.md)
+- [Acceptance Test Matrix (AT-01 to AT-20)](docs/design/07-acceptance.md)
+- [Acceptance Testing Status Record](docs/acceptance-status.md)
+- [Development Preview Report](docs/implementation-preview.md)
 
 ---
 
-## 免責事項 & ライセンス
+## License & Disclaimer
 
-- **ライセンス**: 本プラグインは [MIT License](LICENSE) のもとで公開されています。
-- **商標・提携に関する免責**: 本プラグインは独立したオープンソースプロジェクトであり、Obsidian（Dynalist Inc.）または TypeSafe Inc. の公式製品ではありません。各製品の名称および商標はそれぞれの権利者に帰属します。
+- **License**: Released under the [MIT License](LICENSE).
+- **Disclaimer**: Jev Search is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Obsidian (Dynalist Inc.) or TypeSafe Inc. All trademarks belong to their respective owners.
