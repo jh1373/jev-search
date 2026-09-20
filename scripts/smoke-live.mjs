@@ -10,7 +10,28 @@
  * Synthetic data only. Exactly one HTTP request. The key is never printed.
  * See docs/design/05-testing-release.md and docs/design/07-acceptance.md (AT-07).
  */
-import { prepare, validate, requestFor, ENDPOINTS, transport, PRICE_PER_MTOK, OPENROUTER_MODEL, MODEL, GATEWAY_MODEL } from '../src/core/jev.ts';
+import { prepare, validate, requestFor, ENDPOINTS, PRICE_PER_MTOK, OPENROUTER_MODEL, MODEL, GATEWAY_MODEL } from '../src/core/jev.ts';
+import { createRequestUrlTransport } from '../src/adapters/transport.ts';
+
+const fetchRequester = async (params) => {
+  const res = await fetch(params.url, {
+    method: params.method,
+    headers: params.headers,
+    body: params.body,
+  });
+  const text = await res.text();
+  const headers = {};
+  res.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
+  return {
+    status: res.status,
+    headers,
+    text,
+    arrayBuffer: Buffer.from(text).buffer,
+    json: null,
+  };
+};
+
+const transport = createRequestUrlTransport(fetchRequester);
 
 const KEY_ENV = { openrouter: 'OPENROUTER_API_KEY', direct: 'TYPESAFE_API_KEY', gateway: 'AI_GATEWAY_API_KEY' };
 const MODEL_OF = { openrouter: OPENROUTER_MODEL, direct: MODEL, gateway: GATEWAY_MODEL };

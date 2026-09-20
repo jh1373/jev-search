@@ -48,7 +48,11 @@ export default class JevSearch extends Plugin {
     this.registerEvent(this.app.vault.on('delete',f=>{this.updates.delete(f.path);this.index.remove(f.path);this.invalidate();}));
     this.registerEvent(this.app.vault.on('rename',(f,old)=>{this.updates.delete(old);this.invalidate();this.index.remove(old);if(f instanceof TFile)this.schedule(f);}));
     this.registerEvent(this.app.metadataCache.on('changed',f=>changed(f)));
-    this.app.workspace.onLayoutReady(()=>{if(this.loaded)void this.rebuild();});
+    if (this.app.workspace.layoutReady) {
+      if (this.loaded) void this.rebuild();
+    } else {
+      this.app.workspace.onLayoutReady(()=>{if(this.loaded)void this.rebuild();});
+    }
   }
   list(v:unknown,fallback:string[]):string[]{return Array.isArray(v)&&v.length<=100&&v.every(x=>typeof x==='string'&&x.length<=256)?v:[...fallback];}
   /** Sanitize stored secret names. A value can never round-trip through here. */
