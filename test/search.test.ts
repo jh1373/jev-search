@@ -5,10 +5,10 @@ import type { SearchNote } from '../src/core/search.ts';
 
 const note = (path: string, text: string, title = ''): SearchNote => ({ path, text, title, tags: [] });
 
-test('tokenize normalizes width/case and uses Japanese code point bigrams only', () => {
-  assert.deepEqual(tokenize('ＢＭ２５ 管理 再ランキング'), ['bm25', '管理', '再ラ', 'ラン', 'ンキ', 'キン', 'ング', 'w:ランキング']);
-  assert.deepEqual(tokenize('Foo_bar １２３ a-b 日 あ カ ｶﾀｶﾅ'), ['foo_bar', '123', 'a', 'b', '日', 'あ', 'カ', 'カタ', 'タカ', 'カナ', 'w:カタカナ']);
-  assert.deepEqual(tokenize('𠮷野家 😀 ABC'), ['𠮷野', '野家', 'abc']);
+test('tokenize normalizes width/case, Japanese bigrams, and weighted words/unigrams', () => {
+  assert.deepEqual(tokenize('ＢＭ２５ 管理 再ランキング'), ['bm25', '管理', 'w:管理', 'c:管', 'c:理', '再ラ', 'ラン', 'ンキ', 'キン', 'ング', 'w:ランキング', 'c:再']);
+  assert.deepEqual(tokenize('Foo_bar １２３ a-b 日 あ カ ｶﾀｶﾅ'), ['foo_bar', '123', 'a', 'b', '日', 'c:日', 'あ', 'カ', 'カタ', 'タカ', 'カナ', 'w:カタカナ']);
+  assert.deepEqual(tokenize('𠮷野家 😀 ABC'), ['𠮷野', '野家', 'w:𠮷野家', 'c:𠮷', 'c:野', 'c:家', 'abc']);
   assert.deepEqual(tokenize('! 😀'), []);
 });
 
@@ -20,6 +20,11 @@ test('a katakana run is also one word, and never collides with the bigram of the
   assert.deepEqual(tokenize('メモ'), ['メモ', 'w:メモ']);
   // A single katakana character is not a word.
   assert.deepEqual(tokenize('カ'), ['カ']);
+});
+
+test('han compound words and single-kanji fallback unigrams are generated', () => {
+  assert.deepEqual(tokenize('障害対応'), ['障害', '害対', '対応', 'w:障害対応', 'c:障', 'c:害', 'c:対', 'c:応']);
+  assert.deepEqual(tokenize('有給休暇'), ['有給', '給休', '休暇', 'w:有給休暇', 'c:有', 'c:給', 'c:休', 'c:暇']);
 });
 
 test('exclusions use folder/config boundaries, hidden directories, and normalized paths', () => {

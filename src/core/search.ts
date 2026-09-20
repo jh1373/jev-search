@@ -16,19 +16,17 @@ export interface SearchHit {
 }
 
 /** Prefix for a whole-word token, so it can never collide with a bigram of the same characters. */
-const WORD_PREFIX = 'w:';
+export const WORD_PREFIX = 'w:';
+/** Prefix for a single-kanji fallback token, distinct from single ASCII or Hiragana characters. */
+export const CHAR_PREFIX = 'c:';
 
 /**
- * NFKC ASCII words, Japanese run bigrams (singletons stay unigrams), and each katakana run as a
- * whole word.
- *
- * Bigrams alone lose word identity for katakana loanwords: デプロイ becomes デプ / プロ / ロイ, and
- * プロ also occurs in プロジェクト and プログラマー, so its IDF collapses and unrelated notes match.
- * A katakana run is usually one word, so it is emitted as one extra token alongside its bigrams.
- * On 806 real Japanese Wikipedia introductions with 400 katakana-word queries this raised Recall@5
- * from 46.3% to 61.0% and improved 232 queries without worsening any; the synthetic corpus alone was
- * too weak to show it. Measured effect and its limits: docs/benchmark/result-public-corpus.md and
- * docs/benchmark/result-synthetic-recall.md.
+ * Weighted Hybrid Tokenizer:
+ * - NFKC ASCII words
+ * - Japanese run bigrams (overlapping 2-grams)
+ * - Katakana whole words (e.g. w:デプロイ) with 1.2x scoring weight
+ * - Han whole compound words (e.g. w:障害, w:経費精算) with 1.2x scoring weight
+ * - Han unigrams as fallback anchors (e.g. c:障, c:害) with 0.5x scoring weight
  */
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
@@ -40,9 +38,19 @@ export function tokenize(text: string): string[] {
       tokens.push(run);
     } else {
       const points = Array.from(run);
-      if (points.length === 1) tokens.push(run);
-      else for (let i = 1; i < points.length; i++) tokens.push(points[i - 1] + points[i]);
+      if (points.length === 1) {
+        tokens.push(run);
+      } else {
+        for (let i = 1; i < points.length; i++) tokens.push(points[i - 1] + points[i]);
+      }
+      // Katakana whole words (length >= 2)
       for (const span of run.match(/[\p{Script=Katakana}ー]{2,}/gu) ?? []) tokens.push(WORD_PREFIX + span);
+      // Han whole words (compounds of 2 to 8 characters)
+      for (const span of run.match(/[\p{Script=Han}]{2,8}/gu) ?? []) tokens.push(WORD_PREFIX + span);
+      // Han unigrams as fallback anchors
+      for (const ch of points) {
+        if (/^[\p{Script=Han}]$/u.test(ch)) tokens.push(CHAR_PREFIX + ch);
+      }
     }
   }
   return tokens;
@@ -277,10 +285,13 @@ export class SearchIndex {
         const posting = index.get(term);
         if (!posting) continue;
         const idf = Math.log(1 + (count - posting.size + 0.5) / (posting.size + 0.5));
+        let tokenWeight = 1;
+        if (term.startsWith(WORD_PREFIX)) tokenWeight = 1.2;
+        else if (term.startsWith(CHAR_PREFIX)) tokenWeight = 0.5;
         for (const [id, tf] of posting) {
           const length = this.entries.get(id)!.fields[fieldIndex].length;
           const bm25 = idf * (tf * 2.2) / (tf + 1.2 * (0.25 + 0.75 * length / averageLength));
-          scores.set(id, (scores.get(id) ?? 0) + weights[fieldIndex] * bm25);
+          scores.set(id, (scores.get(id) ?? 0) + weights[fieldIndex] * bm25 * tokenWeight);
         }
       }
     });
