@@ -75,21 +75,21 @@ flowchart TD
 
 ## Key Features
 
-### ⚡ Ultra-Fast Local Search (BM25 Engine)
+### Ultra-Fast Local Search (BM25 Engine)
 - **10,000 Notes Searched in 15ms**: Background incremental indexing builds 10,000 notes in ~16 seconds without ever freezing the Obsidian UI.
 - **Weighted Hybrid Tokenizer**: Handles full English words, alphanumeric tokens, Kanji compound words, Katakana runs, and character 2-grams without requiring heavy multi-megabyte dictionary files. Retains a 100% Recall@50 for exact query expressions.
 
-### 🧠 Calibrated Jev AI Reranking
+### Calibrated Jev AI Reranking
 - Top local candidates are evaluated against your question on a 3-tier calibrated scale (`Direct Answer`, `Relevant Topic`, `Unrelated`).
 - Reorders search results so the note with the highest information density and contextual relevance lands at rank #1.
 
-### 🔒 Privacy-First Design
+### Privacy-First Design
 - **Strict Opt-In (Default OFF)**: Without explicitly entering an API key and requesting a rerank, zero network traffic is emitted. The local search engine operates 100% offline.
 - **Pre-flight Consent Modal**: Inspect the exact JSON payload, character count, and estimated cost before any data leaves your machine.
 - **Automatic Exclusion Filtering**: Sensitive folders (e.g. `Confidential/`) and private tags (e.g. `#private`, `#secret`) are excluded both before indexing and prior to network transmission.
 - **Secure Key Storage**: API keys are isolated in Obsidian SecretStorage or kept solely in temporary session memory. Keys are never written to `data.json` or saved in plain text.
 
-### 📱 Mobile & Desktop Ready (`requestUrl` Compliant)
+### Mobile & Desktop Ready (`requestUrl` Compliant)
 - Completely eliminates desktop-only Node.js networking libraries (`node:https`). Uses Obsidian's native `requestUrl` API, ensuring seamless compatibility across Desktop (Windows, macOS, Linux) and Mobile (iOS, Android).
 
 ---
